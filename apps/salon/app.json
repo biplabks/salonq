@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "SalonQ Dashboard",
+    "slug": "salonq-salon",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.salonq.salon" },
+    "android": { "package": "com.salonq.salon" },
+    "web": { "bundler": "metro" }
+  }
+}

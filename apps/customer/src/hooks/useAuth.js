@@ -1,17 +1,17 @@
 // apps/customer/src/hooks/useAuth.js
 import { useState, useEffect } from "react";
-import { onAuthChange } from "salonq-shared/firebase";
+import { onAuthChange } from "../firebase";
 
 export function useAuth() {
-  const [user, setUser]     = useState(null);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthChange((u) => {
+    const unsub = onAuthChange((u) => {
       setUser(u);
       setLoading(false);
     });
-    return unsubscribe;
+    return unsub;
   }, []);
 
   return { user, loading };

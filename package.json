@@ -2,14 +2,11 @@
   "name": "salonq",
   "version": "1.0.0",
   "private": true,
-  "workspaces": [
-    "apps/customer",
-    "apps/salon",
-    "packages/shared"
-  ],
   "scripts": {
     "customer": "cd apps/customer && npx expo start",
-    "salon": "cd apps/salon && npx expo start",
-    "install:all": "npm install && npm install --workspaces"
+    "salon": "cd apps/salon && npx expo start"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.7.0"
   }
 }
