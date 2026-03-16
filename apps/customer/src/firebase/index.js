@@ -94,6 +94,21 @@ export const saveSalon = (salonId, data) =>
 // ── Queue ─────────────────────────────────────────────────────────────────────
 export const joinQueue = async ({ salonId, customerId, customerName, services, stylistId = null }) => {
   const queueRef = collection(db, "salons", salonId, "queue");
+
+  // Prevent logged-in customer from joining the same salon twice
+  // Single where() to avoid composite index requirement; filter active statuses client-side
+  if (customerId) {
+    const dupSnap = await getDocs(
+      query(queueRef, where("customerId", "==", customerId))
+    );
+    const alreadyActive = dupSnap.docs.some((d) =>
+      ["waiting", "called", "in-service"].includes(d.data().status)
+    );
+    if (alreadyActive) {
+      throw new Error("You're already in this salon's queue. Leave the current queue first.");
+    }
+  }
+
   const waitingSnap = await getDocs(
     query(queueRef, where("status", "==", "waiting"))
   );

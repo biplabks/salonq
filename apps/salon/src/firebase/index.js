@@ -1,7 +1,8 @@
 // apps/salon/src/firebase/index.js
 import { initializeApp, getApps } from "firebase/app";
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signOut, onAuthStateChanged,
 } from "firebase/auth";
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc,
@@ -24,9 +25,10 @@ export const firestore = getFirestore(app);
 export const db        = firestore;
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-export const loginWithEmail  = (email, password) => signInWithEmailAndPassword(auth, email, password);
-export const logout          = () => signOut(auth);
-export const onAuthChange    = (cb) => onAuthStateChanged(auth, cb);
+export const loginWithEmail    = (email, password) => signInWithEmailAndPassword(auth, email, password);
+export const registerWithEmail = (email, password) => createUserWithEmailAndPassword(auth, email, password);
+export const logout            = () => signOut(auth);
+export const onAuthChange      = (cb) => onAuthStateChanged(auth, cb);
 
 // ── Staff → Salon linking ─────────────────────────────────────────────────────
 

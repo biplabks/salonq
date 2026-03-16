@@ -1,8 +1,8 @@
 // apps/customer/src/screens/CheckInScreen.js
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, SafeAreaView,
+  ActivityIndicator, Alert, SafeAreaView, Modal,
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -15,6 +15,7 @@ export default function CheckInScreen({ route, navigation }) {
   const [selectedStylist, setSelectedStylist] = useState(null);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
+  const [queueBlockModal, setQueueBlockModal] = useState(null); // { salonName }
 
   const toggleService = (service) =>
     setSelectedServices((prev) =>
@@ -30,6 +31,28 @@ export default function CheckInScreen({ route, navigation }) {
 
   const handleCheckIn = async () => {
     if (!selectedServices.length) { Alert.alert("Select a service"); return; }
+
+    // Block if already in an active queue
+    const existing = await AsyncStorage.getItem("activeQueue");
+    if (existing) {
+      try {
+        const { salonId: activeSalonId, entryId, salonName } = JSON.parse(existing);
+        // Verify entry is still active in Firestore before blocking
+        const { getDoc, doc } = await import("firebase/firestore");
+        const { db } = await import("../firebase");
+        const snap = await getDoc(doc(db, "salons", activeSalonId, "queue", entryId));
+        const activeStatuses = ["waiting", "called", "in-service"];
+        if (snap.exists() && activeStatuses.includes(snap.data().status)) {
+          setQueueBlockModal({ salonName: salonName || "a salon", salonId: activeSalonId, entryId });
+          return;
+        }
+        // Entry is done/missing — clear stale record
+        await AsyncStorage.removeItem("activeQueue");
+      } catch {
+        await AsyncStorage.removeItem("activeQueue");
+      }
+    }
+
     setLoading(true);
     try {
       const user = getAuth().currentUser;
@@ -84,6 +107,39 @@ export default function CheckInScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
+      {/* Already-in-queue modal */}
+      <Modal transparent animationType="fade" visible={!!queueBlockModal} onRequestClose={() => setQueueBlockModal(null)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalBox}>
+            <Text style={s.modalIcon}>🔒</Text>
+            <Text style={s.modalTitle}>Already in a queue</Text>
+            <Text style={s.modalBody}>
+              You're currently waiting at{" "}
+              <Text style={{ fontWeight: "700", color: "#1a1a2e" }}>{queueBlockModal?.salonName}</Text>.
+              {"\n"}Leave that queue before joining a new one.
+            </Text>
+            <TouchableOpacity
+              style={s.modalPrimary}
+              onPress={() => {
+                setQueueBlockModal(null);
+                navigation.navigate("Main", {
+                  screen: "Queue",
+                  params: {
+                    salonId:   queueBlockModal?.salonId,
+                    entryId:   queueBlockModal?.entryId,
+                    salonName: queueBlockModal?.salonName,
+                  },
+                });
+              }}
+            >
+              <Text style={s.modalPrimaryText}>View my queue →</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.modalSecondary} onPress={() => setQueueBlockModal(null)}>
+              <Text style={s.modalSecondaryText}>Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       {/* Top bar */}
       <View style={s.topBar}>
         <TouchableOpacity onPress={() => step > 1 ? setStep(step - 1) : navigation.goBack()}>
@@ -254,4 +310,13 @@ const s = StyleSheet.create({
   nextBtn:       { backgroundColor: "#1a1a2e", borderRadius: 14, paddingVertical: 16, alignItems: "center" },
   nextBtnText:   { color: "#fff", fontSize: 16, fontWeight: "800" },
   empty:         { color: "#9ca3af", textAlign: "center", paddingTop: 24 },
+  modalOverlay:  { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center", padding: 24 },
+  modalBox:      { backgroundColor: "#fff", borderRadius: 20, padding: 28, width: "100%", maxWidth: 360, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 20, elevation: 10 },
+  modalIcon:     { fontSize: 44, marginBottom: 12 },
+  modalTitle:    { fontSize: 20, fontWeight: "800", color: "#1a1a2e", marginBottom: 10, textAlign: "center" },
+  modalBody:     { fontSize: 14, color: "#6b7280", textAlign: "center", lineHeight: 22, marginBottom: 24 },
+  modalPrimary:  { backgroundColor: "#1a1a2e", borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, width: "100%", alignItems: "center", marginBottom: 10 },
+  modalPrimaryText:   { color: "#fff", fontSize: 15, fontWeight: "700" },
+  modalSecondary:     { paddingVertical: 10 },
+  modalSecondaryText: { color: "#9ca3af", fontSize: 14 },
 });

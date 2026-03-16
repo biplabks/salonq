@@ -53,6 +53,13 @@ export default function QueueTrackerScreen({ route }) {
 
   const { entry, loading } = useQueueEntry(activeQueue?.salonId, activeQueue?.entryId);
 
+  // Auto-clear AsyncStorage when the entry is done/no-show so the customer can join again
+  useEffect(() => {
+    if (entry && (entry.status === "done" || entry.status === "no-show")) {
+      AsyncStorage.removeItem("activeQueue").catch(() => {});
+    }
+  }, [entry?.status]);
+
   // Clear active queue from storage and state
   const clearQueue = async () => {
     try {

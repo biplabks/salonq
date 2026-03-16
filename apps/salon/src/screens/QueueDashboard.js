@@ -9,7 +9,7 @@ import {
   saveSalon, getSalon,
   serverTimestamp, addDoc, collection, firestore,
 } from "../firebase";
-import { getDocs, query, where, orderBy } from "firebase/firestore";
+import { getDocs, query, where } from "firebase/firestore";
 import { recalculateQueue } from "../utils/waitTimeEngine";
 
 const STATUS_COLORS = {
@@ -39,14 +39,15 @@ function WalkInModal({ visible, onClose, salon, salonId, onAdded }) {
 
   const handleAdd = async () => {
     if (!name || !selected.length) {
-      Alert.alert("Missing info", "Please enter a name and select at least one service.");
+      if (Platform.OS === "web") window.alert("Please enter a name and select at least one service.");
+      else Alert.alert("Missing info", "Please enter a name and select at least one service.");
       return;
     }
     setLoading(true);
     try {
       const queueRef   = collection(firestore, "salons", salonId, "queue");
       const activeSnap = await getDocs(
-        query(queueRef, where("status", "in", ["waiting", "called", "in-service"]), orderBy("position"))
+        query(queueRef, where("status", "in", ["waiting", "called", "in-service"]))
       );
       const nextPosition  = activeSnap.size + 1;
       const totalDuration = selected.reduce((s, sv) => s + (sv.durationMin || 30), 0);
@@ -74,7 +75,8 @@ function WalkInModal({ visible, onClose, salon, salonId, onAdded }) {
       onClose();
       if (onAdded) onAdded();
     } catch (err) {
-      Alert.alert("Error", err.message);
+      if (Platform.OS === "web") window.alert(`Error: ${err.message}`);
+      else Alert.alert("Error", err.message);
     } finally {
       setLoading(false);
     }

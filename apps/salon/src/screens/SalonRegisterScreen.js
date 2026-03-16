@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import { createSalon, linkStaffToSalon } from "../firebase";
+import LocationPickerWeb from "../components/LocationPickerWeb";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -27,6 +28,7 @@ export default function SalonRegisterScreen({ onSalonCreated }) {
   const [address,  setAddress]  = useState("");
   const [city,     setCity]     = useState("");
   const [phone,    setPhone]    = useState("");
+  const [location, setLocation] = useState({ lat: 0, lng: 0 });
 
   // Existing salon
   const [salonId,  setSalonId]  = useState("");
@@ -47,7 +49,7 @@ export default function SalonRegisterScreen({ onSalonCreated }) {
         city,
         phone,
         photos:   [],
-        location: { lat: 0, lng: 0 },
+        location,
         hours:    DEFAULT_HOURS,
         services: [
           { id: "s1", name: "Haircut",            price: 300,  durationMin: 30 },
@@ -130,6 +132,13 @@ export default function SalonRegisterScreen({ onSalonCreated }) {
 
             <Text style={s.label}>Phone</Text>
             <TextInput style={s.input} placeholder="e.g. +880 1700 000000" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+
+            <Text style={s.label}>Location on map</Text>
+            <LocationPickerWeb
+              value={location}
+              onChange={setLocation}
+              darkMode
+            />
 
             <Text style={s.note}>
               📝 Default services and hours will be added automatically. You can edit them later.

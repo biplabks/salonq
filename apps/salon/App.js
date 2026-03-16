@@ -12,6 +12,7 @@ import QueueDashboard      from "./src/screens/QueueDashboard";
 import StylistBoard        from "./src/screens/StylistBoard";
 import SalonLogin          from "./src/screens/SalonLogin";
 import SalonRegisterScreen from "./src/screens/SalonRegisterScreen";
+import SalonSettingsScreen from "./src/screens/SalonSettingsScreen";
 
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -27,7 +28,6 @@ export default function App() {
     return onAuthChange(async (u) => {
       setUser(u);
       if (u) {
-        // Check if this staff member has a salon linked
         const linkedSalon = await getStaffSalon(u.uid);
         if (linkedSalon) {
           setSalonId(linkedSalon.id);
@@ -41,7 +41,7 @@ export default function App() {
     });
   }, []);
 
-  // Subscribe to salon document in real-time once we have a salonId
+  // Live salon subscription
   useEffect(() => {
     if (!salonId) return;
     const unsub = onSnapshot(doc(firestore, "salons", salonId), (snap) => {
@@ -50,10 +50,7 @@ export default function App() {
     return unsub;
   }, [salonId]);
 
-  // Called after salon registration or joining
-  const handleSalonCreated = (newSalonId) => {
-    setSalonId(newSalonId);
-  };
+  const handleSalonCreated = (newSalonId) => setSalonId(newSalonId);
 
   if (loading) {
     return (
@@ -64,7 +61,7 @@ export default function App() {
     );
   }
 
-  // Not logged in → show login
+  // Not logged in
   if (!user) {
     return (
       <NavigationContainer>
@@ -75,12 +72,12 @@ export default function App() {
     );
   }
 
-  // Logged in but no salon linked → show registration
+  // Logged in but no salon
   if (!salonId) {
     return <SalonRegisterScreen onSalonCreated={handleSalonCreated} />;
   }
 
-  // Logged in with salon → show dashboard
+  // Logged in with salon → full dashboard
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -88,7 +85,9 @@ export default function App() {
           headerShown: false,
           tabBarIcon: () => (
             <Text style={{ fontSize: 20 }}>
-              {route.name === "Queue" ? "⏳" : "💇"}
+              {route.name === "Queue"    ? "⏳"
+             : route.name === "Stylists" ? "💇"
+             : "⚙️"}
             </Text>
           ),
           tabBarActiveTintColor:   "#1a1a2e",
@@ -101,6 +100,9 @@ export default function App() {
         </Tab.Screen>
         <Tab.Screen name="Stylists">
           {() => <StylistBoard salon={salon} salonId={salonId} />}
+        </Tab.Screen>
+        <Tab.Screen name="Settings">
+          {() => <SalonSettingsScreen salon={salon} salonId={salonId} />}
         </Tab.Screen>
       </Tab.Navigator>
     </NavigationContainer>
