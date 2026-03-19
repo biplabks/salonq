@@ -2,9 +2,10 @@
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
-  ScrollView, Switch, Alert, ActivityIndicator, Platform,
+  ScrollView, Switch, ActivityIndicator,
 } from "react-native";
 import { saveSalon } from "../firebase";
+import { crossAlert, crossAlertInfo } from "../utils/crossAlert";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const DAY_LABELS = {
@@ -49,18 +50,13 @@ export default function ManageHoursScreen({ salon, salonId, onBack }) {
     }));
   };
 
-  const showAlert = (title, msg) => {
-    if (Platform.OS === "web") window.alert(msg ? `${title}\n${msg}` : title);
-    else Alert.alert(title, msg);
-  };
-
   const handleSave = async () => {
     setLoading(true);
     try {
       await saveSalon(salonId, { hours });
-      showAlert("Saved! ✅", "Opening hours updated successfully.");
+      crossAlertInfo("Saved! ✅", "Opening hours updated successfully.");
     } catch (err) {
-      showAlert("Error", err.message);
+      crossAlertInfo("Error", err.message);
     } finally {
       setLoading(false);
     }
@@ -77,19 +73,12 @@ export default function ManageHoursScreen({ salon, salonId, onBack }) {
         return updated;
       });
     };
-    if (Platform.OS === "web") {
-      if (window.confirm(`Apply ${DAY_LABELS[day]}'s hours to Mon–Fri?`)) apply();
-      return;
-    }
-    Alert.alert(
+    crossAlert(
       "Copy to weekdays?",
       `Apply ${DAY_LABELS[day]}'s hours to Mon–Fri?`,
       [
         { text: "Cancel", style: "cancel" },
-        {
-          text: "Yes",
-          onPress: apply,
-        },
+        { text: "Yes", onPress: apply },
       ]
     );
   };

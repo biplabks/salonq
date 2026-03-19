@@ -1,21 +1,23 @@
 // apps/salon/src/screens/SalonSettingsScreen.js
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  SafeAreaView, Alert,
+  SafeAreaView,
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import { logout } from "../firebase";
-import ManageStylistsScreen  from "./ManageStylistsScreen";
-import ManageServicesScreen  from "./ManageServicesScreen";
-import ManageHoursScreen     from "./ManageHoursScreen";
+import { crossAlert, crossAlertInfo } from "../utils/crossAlert";
+import ManageStylistsScreen   from "./ManageStylistsScreen";
+import ManageServicesScreen   from "./ManageServicesScreen";
+import ManageHoursScreen      from "./ManageHoursScreen";
+import ManagePromoCodesScreen from "./ManagePromoCodesScreen";
 
 export default function SalonSettingsScreen({ salon, salonId }) {
-  const [screen, setScreen] = useState("main"); // "main" | "stylists" | "services" | "hours"
+  const [screen, setScreen] = useState("main"); // "main" | "stylists" | "services" | "hours" | "promos"
   const user = getAuth().currentUser;
 
   const handleSignOut = () => {
-    Alert.alert(
+    crossAlert(
       "Sign out",
       "Are you sure you want to sign out?",
       [
@@ -25,7 +27,7 @@ export default function SalonSettingsScreen({ salon, salonId }) {
           style: "destructive",
           onPress: async () => {
             try { await logout(); }
-            catch (err) { Alert.alert("Error", err.message); }
+            catch (err) { crossAlertInfo("Error", err.message); }
           },
         },
       ]
@@ -41,6 +43,9 @@ export default function SalonSettingsScreen({ salon, salonId }) {
   }
   if (screen === "hours") {
     return <ManageHoursScreen salon={salon} salonId={salonId} onBack={() => setScreen("main")} />;
+  }
+  if (screen === "promos") {
+    return <ManagePromoCodesScreen salon={salon} salonId={salonId} onBack={() => setScreen("main")} />;
   }
 
   return (
@@ -83,9 +88,14 @@ export default function SalonSettingsScreen({ salon, salonId }) {
           onPress={() => setScreen("hours")}
         />
         <MenuItem
+          emoji="🎟️"
+          label="Promo codes"
+          onPress={() => setScreen("promos")}
+        />
+        <MenuItem
           emoji="👥"
           label="Manage staff"
-          onPress={() => Alert.alert("Coming soon 🚀", "Staff management coming in the next update!")}
+          onPress={() => crossAlertInfo("Coming soon 🚀", "Staff management coming in the next update!")}
           last
         />
       </View>

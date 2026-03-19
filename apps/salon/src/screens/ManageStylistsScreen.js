@@ -2,9 +2,10 @@
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
-  TextInput, Alert, ScrollView, Modal, ActivityIndicator, Platform,
+  TextInput, ScrollView, Modal, ActivityIndicator,
 } from "react-native";
 import { saveSalon } from "../firebase";
+import { crossAlert, crossAlertInfo } from "../utils/crossAlert";
 
 const AVAILABLE_SKILLS = [
   "Haircut", "Haircut & Blow-dry", "Hair Colour",
@@ -45,11 +46,11 @@ export default function ManageStylistsScreen({ salon, salonId, onBack }) {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Platform.OS === "web" ? window.alert("Please enter a name.") : Alert.alert("Please enter a name");
+      crossAlertInfo("Validation", "Please enter a name.");
       return;
     }
     if (!skills.length) {
-      Platform.OS === "web" ? window.alert("Please select at least one skill.") : Alert.alert("Please select at least one skill");
+      crossAlertInfo("Validation", "Please select at least one skill.");
       return;
     }
 
@@ -74,7 +75,7 @@ export default function ManageStylistsScreen({ salon, salonId, onBack }) {
       setStylists(updated);
       setShowModal(false);
     } catch (err) {
-      Platform.OS === "web" ? window.alert(`Error: ${err.message}`) : Alert.alert("Error", err.message);
+      crossAlertInfo("Error", err.message);
     } finally {
       setLoading(false);
     }
@@ -87,17 +88,13 @@ export default function ManageStylistsScreen({ salon, salonId, onBack }) {
         await saveSalon(salonId, { stylists: updated });
         setStylists(updated);
       } catch (err) {
-        Platform.OS === "web" ? window.alert(`Error: ${err.message}`) : Alert.alert("Error", err.message);
+        crossAlertInfo("Error", err.message);
       }
     };
-    if (Platform.OS === "web") {
-      if (window.confirm(`Remove ${stylist.name} from your team?`)) doDelete();
-    } else {
-      Alert.alert("Delete stylist?", `Remove ${stylist.name} from your team?`, [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: doDelete },
-      ]);
-    }
+    crossAlert("Delete stylist?", `Remove ${stylist.name} from your team?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: doDelete },
+    ]);
   };
 
   return (

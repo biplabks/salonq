@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  SafeAreaView, ActivityIndicator, Alert, Platform,
+  SafeAreaView, ActivityIndicator, Alert, Platform, ScrollView,
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import { getCustomer, logout } from "../firebase";
@@ -74,7 +74,8 @@ export default function ProfileScreen({ navigation }) {
         <MenuItem
           emoji="👨‍👩‍👧"
           label="Family members"
-          onPress={() => handleComingSoon("Family members")}
+          onPress={() => navigation.navigate("FamilyMembers")}
+          badge={customer?.familyMembers?.length || null}
           last={false}
         />
         <MenuItem
@@ -95,7 +96,7 @@ export default function ProfileScreen({ navigation }) {
   );
 }
 
-const MenuItem = ({ emoji, label, onPress, last }) => (
+const MenuItem = ({ emoji, label, onPress, last, badge }) => (
   <TouchableOpacity
     style={[s.menuItem, last && { borderBottomWidth: 0 }]}
     onPress={onPress}
@@ -103,6 +104,7 @@ const MenuItem = ({ emoji, label, onPress, last }) => (
   >
     <Text style={s.menuEmoji}>{emoji}</Text>
     <Text style={s.menuLabel}>{label}</Text>
+    {badge ? <View style={s.badge}><Text style={s.badgeText}>{badge}</Text></View> : null}
     <Text style={s.menuArrow}>›</Text>
   </TouchableOpacity>
 );
@@ -121,6 +123,8 @@ const s = StyleSheet.create({
   menuEmoji:  { fontSize: 20, marginRight: 14 },
   menuLabel:  { flex: 1, fontSize: 15, color: "#1a1a2e", fontWeight: "500" },
   menuArrow:  { fontSize: 22, color: "#9ca3af" },
+  badge:      { backgroundColor: "#1a1a2e", borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2, marginRight: 8 },
+  badgeText:  { color: "#fff", fontSize: 11, fontWeight: "700" },
   logoutBtn:  { backgroundColor: "#fff", borderRadius: 14, paddingVertical: 16, alignItems: "center", borderWidth: 1, borderColor: "#fee2e2" },
   logoutText: { color: "#ef4444", fontSize: 15, fontWeight: "700" },
   version:    { textAlign: "center", color: "#9ca3af", fontSize: 12, marginTop: 20 },

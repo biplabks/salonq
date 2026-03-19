@@ -2,9 +2,10 @@
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView,
-  TextInput, Alert, ScrollView, Modal, ActivityIndicator, Platform,
+  TextInput, ScrollView, Modal, ActivityIndicator,
 } from "react-native";
 import { saveSalon } from "../firebase";
+import { crossAlert, crossAlertInfo } from "../utils/crossAlert";
 
 const CATEGORIES = ["Hair", "Colour", "Grooming", "Nails", "Treatment", "Other"];
 
@@ -38,10 +39,9 @@ export default function ManageServicesScreen({ salon, salonId, onBack }) {
   };
 
   const handleSave = async () => {
-    const warn = (msg) => Platform.OS === "web" ? window.alert(msg) : Alert.alert(msg);
-    if (!name.trim())                       { warn("Please enter a service name"); return; }
-    if (!price || isNaN(price))             { warn("Please enter a valid price"); return; }
-    if (!durationMin || isNaN(durationMin)) { warn("Please enter a valid duration"); return; }
+    if (!name.trim())                       { crossAlertInfo("Validation", "Please enter a service name."); return; }
+    if (!price || isNaN(price))             { crossAlertInfo("Validation", "Please enter a valid price."); return; }
+    if (!durationMin || isNaN(durationMin)) { crossAlertInfo("Validation", "Please enter a valid duration."); return; }
 
     setLoading(true);
     try {
@@ -65,8 +65,7 @@ export default function ManageServicesScreen({ salon, salonId, onBack }) {
       setServices(updated);
       setShowModal(false);
     } catch (err) {
-      if (Platform.OS === "web") window.alert(`Error: ${err.message}`);
-      else Alert.alert("Error", err.message);
+      crossAlertInfo("Error", err.message);
     } finally {
       setLoading(false);
     }
@@ -79,22 +78,13 @@ export default function ManageServicesScreen({ salon, salonId, onBack }) {
         await saveSalon(salonId, { services: updated });
         setServices(updated);
       } catch (err) {
-        if (Platform.OS === "web") window.alert(`Error: ${err.message}`);
-        else Alert.alert("Error", err.message);
+        crossAlertInfo("Error", err.message);
       }
     };
-    if (Platform.OS === "web") {
-      if (window.confirm(`Remove "${service.name}" from your services?`)) doDelete();
-      return;
-    }
-    Alert.alert(
-      "Delete service?",
-      `Remove "${service.name}" from your services?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: doDelete },
-      ]
-    );
+    crossAlert("Delete service?", `Remove "${service.name}" from your services?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: doDelete },
+    ]);
   };
 
   // Group services by category

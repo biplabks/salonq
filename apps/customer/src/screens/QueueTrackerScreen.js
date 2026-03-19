@@ -9,7 +9,7 @@ import { useQueueEntry } from "../hooks/useQueue";
 import { updateQueueEntry } from "../firebase";
 import { formatWait, formatTime, STATUS_LABELS, STATUS_COLORS } from "../utils";
 
-export default function QueueTrackerScreen({ route }) {
+export default function QueueTrackerScreen({ route, navigation }) {
   const [activeQueue, setActiveQueue] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -98,6 +98,14 @@ export default function QueueTrackerScreen({ route }) {
         ]
       );
     }
+  };
+
+  const handleViewReceipt = () => {
+    navigation.navigate("Receipt", {
+      salonId:   activeQueue.salonId,
+      entryId:   activeQueue.entryId,
+      salonName: activeQueue.salonName,
+    });
   };
 
   // ── Loading state ──
@@ -209,6 +217,13 @@ export default function QueueTrackerScreen({ route }) {
         </View>
       )}
 
+      {/* View Receipt button when done */}
+      {entry.status === "done" && (
+        <TouchableOpacity style={s.receiptBtn} onPress={handleViewReceipt}>
+          <Text style={s.receiptBtnText}>🧾 View Receipt</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Leave queue button */}
       {!isDone && entry.status !== "in-service" && (
         <TouchableOpacity style={s.leaveBtn} onPress={handleLeave}>
@@ -247,6 +262,8 @@ const s = StyleSheet.create({
   summaryDuration:{ fontSize: 14, color: "#6b7280" },
   tip:            { backgroundColor: "#eff6ff", borderRadius: 12, padding: 14, marginBottom: 16 },
   tipText:        { fontSize: 13, color: "#1d4ed8", lineHeight: 18 },
+  receiptBtn:     { backgroundColor: "#f0fdf4", borderRadius: 14, paddingVertical: 14, alignItems: "center", marginBottom: 10, borderWidth: 1, borderColor: "#bbf7d0" },
+  receiptBtnText: { color: "#16a34a", fontSize: 15, fontWeight: "700" },
   leaveBtn:       { alignItems: "center", paddingVertical: 14 },
   leaveBtnText:   { color: "#ef4444", fontSize: 15, fontWeight: "600" },
   doneBtn:        { backgroundColor: "#1a1a2e", borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 12 },

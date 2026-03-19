@@ -2,12 +2,19 @@
 // Only bundled on iOS/Android — react-native-maps is not web-compatible
 import React, { useRef } from "react";
 import { View, FlatList, TouchableOpacity, Text, StyleSheet, Dimensions } from "react-native";
-import MapView, { Marker, Callout } from "react-native-maps";
+// Lazy require avoids module-level Platform access on RN 0.76 New Architecture
+// (react-native-maps accesses Platform.OS at evaluation time, which races with
+//  TurboModule registration and causes 'PlatformConstants could not be found')
 import { isSalonOpen, formatWait } from "../utils";
 
 const { width, height } = Dimensions.get("window");
 
 export default function SalonMap({ filtered, region, onSalonPress }) {
+  // Deferred require — runs when component mounts, after native runtime is ready
+  const RNMaps = require("react-native-maps");
+  const MapView = RNMaps.default;
+  const { Marker, Callout } = RNMaps;
+
   const mapRef = useRef(null);
 
   const focusMapOnSalon = (salon) => {

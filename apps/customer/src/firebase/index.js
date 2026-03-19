@@ -92,7 +92,10 @@ export const saveSalon = (salonId, data) =>
   setDoc(doc(db, "salons", salonId), { ...data, updatedAt: serverTimestamp() }, { merge: true });
 
 // ── Queue ─────────────────────────────────────────────────────────────────────
-export const joinQueue = async ({ salonId, customerId, customerName, services, stylistId = null }) => {
+export const joinQueue = async ({
+  salonId, customerId, customerName, services, stylistId = null,
+  familyMembers = [], checkingInSelf = true, peopleCount = 1,
+}) => {
   const queueRef = collection(db, "salons", salonId, "queue");
 
   // Prevent logged-in customer from joining the same salon twice
@@ -120,7 +123,11 @@ export const joinQueue = async ({ salonId, customerId, customerName, services, s
     customerName,
     services,
     stylistId,
+    familyMembers,
+    checkingInSelf,
+    peopleCount,
     status: "waiting",
+    paymentStatus: "pending",
     type: "online",
     position,
     estimatedWaitMin: (position - 1) * totalDuration,
@@ -168,9 +175,11 @@ export const completeService = async (salonId, entryId, stylistId) => {
     await addDoc(collection(db, "customers", entry.customerId, "visits"), {
       salonId,
       stylistId,
-      services: entry.services,
-      totalPrice: entry.services.reduce((s, sv) => s + sv.price, 0),
-      completedAt: serverTimestamp(),
+      services:      entry.services,
+      familyMembers: entry.familyMembers || [],
+      peopleCount:   entry.peopleCount   || 1,
+      totalPrice:    entry.totalAfterDiscount || entry.services.reduce((s, sv) => s + sv.price, 0),
+      completedAt:   serverTimestamp(),
     });
   }
 };

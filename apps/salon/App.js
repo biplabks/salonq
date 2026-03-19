@@ -13,6 +13,7 @@ import StylistBoard        from "./src/screens/StylistBoard";
 import SalonLogin          from "./src/screens/SalonLogin";
 import SalonRegisterScreen from "./src/screens/SalonRegisterScreen";
 import SalonSettingsScreen from "./src/screens/SalonSettingsScreen";
+import AnalyticsScreen     from "./src/screens/AnalyticsScreen";
 
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -23,7 +24,6 @@ export default function App() {
   const [salonId, setSalonId] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Auth state
   useEffect(() => {
     return onAuthChange(async (u) => {
       setUser(u);
@@ -61,7 +61,6 @@ export default function App() {
     );
   }
 
-  // Not logged in
   if (!user) {
     return (
       <NavigationContainer>
@@ -72,12 +71,10 @@ export default function App() {
     );
   }
 
-  // Logged in but no salon
   if (!salonId) {
     return <SalonRegisterScreen onSalonCreated={handleSalonCreated} />;
   }
 
-  // Logged in with salon → full dashboard
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -85,8 +82,9 @@ export default function App() {
           headerShown: false,
           tabBarIcon: () => (
             <Text style={{ fontSize: 20 }}>
-              {route.name === "Queue"    ? "⏳"
-             : route.name === "Stylists" ? "💇"
+              {route.name === "Queue"     ? "⏳"
+             : route.name === "Stylists"  ? "💇"
+             : route.name === "Analytics" ? "📊"
              : "⚙️"}
             </Text>
           ),
@@ -100,6 +98,9 @@ export default function App() {
         </Tab.Screen>
         <Tab.Screen name="Stylists">
           {() => <StylistBoard salon={salon} salonId={salonId} />}
+        </Tab.Screen>
+        <Tab.Screen name="Analytics">
+          {() => <AnalyticsScreen salonId={salonId} salon={salon} />}
         </Tab.Screen>
         <Tab.Screen name="Settings">
           {() => <SalonSettingsScreen salon={salon} salonId={salonId} />}

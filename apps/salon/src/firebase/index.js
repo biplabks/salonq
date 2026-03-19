@@ -103,7 +103,7 @@ export const completeService = async (salonId, entryId, stylistId) => {
     await addDoc(collection(firestore, "customers", entry.customerId, "visits"), {
       salonId, stylistId,
       services:   entry.services,
-      totalPrice: entry.services.reduce((s, sv) => s + sv.price, 0),
+      totalPrice: entry.totalAfterDiscount || entry.services.reduce((s, sv) => s + sv.price, 0),
       completedAt: serverTimestamp(),
     });
   }

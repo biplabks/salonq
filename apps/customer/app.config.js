@@ -36,5 +36,10 @@ export default {
       favicon: "./assets/favicon.png",
       bundler: "metro",
     },
+    extra: {
+      eas: {
+        projectId: "4ec2cd8f-26df-426c-b411-06d1e9883648",
+      },
+    },
   },
 };
