@@ -5,30 +5,25 @@ import {
   ActivityIndicator, SafeAreaView,
 } from "react-native";
 import { getSalon } from "../firebase";
-import { useSalonQueue } from "../hooks/useQueue";
 import { formatWait, isSalonOpen, formatPrice, DAYS, DAY_LABELS } from "../utils";
 
 export default function SalonDetailScreen({ route, navigation }) {
   const { salonId } = route.params;
-  const [salon, setSalon] = useState(null);
+  const [salon,   setSalon]   = useState(null);
   const [loading, setLoading] = useState(true);
-  const { queue } = useSalonQueue(salonId);
-  const liveQueueCount = queue.filter((e) => e.status === "waiting").length;
-  const [tab, setTab] = useState("services");
+  const [tab,     setTab]     = useState("services");
 
   useEffect(() => {
     getSalon(salonId).then((s) => { setSalon(s); setLoading(false); });
   }, [salonId]);
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#1a1a2e" /></View>;
-  if (!salon) return <View style={s.center}><Text>Salon not found.</Text></View>;
+  if (!salon)  return <View style={s.center}><Text>Salon not found.</Text></View>;
 
   const open = isSalonOpen(salon.hours);
 
-  // If salon is closed, all stylists are shown as "off"
   const stylists = (salon.stylists || []).map((st) => ({
-    ...st,
-    status: open ? st.status : "off",
+    ...st, status: open ? st.status : "off",
   }));
 
   const stylistStatusConfig = {
@@ -61,20 +56,33 @@ export default function SalonDetailScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* Join Queue CTA - only when open */}
+        {/* Rating row */}
+        {salon.avgRating ? (
+          <TouchableOpacity
+            style={s.ratingRow}
+            onPress={() => navigation.navigate("Reviews", {
+              salonId,
+              salonName:    salon.name,
+              avgRating:    salon.avgRating,
+              totalRatings: salon.totalRatings,
+            })}
+          >
+            <View style={s.ratingLeft}>
+              <Text style={s.ratingStar}>★</Text>
+              <Text style={s.ratingValue}>{salon.avgRating?.toFixed(1)}</Text>
+              <Text style={s.ratingCount}>({salon.totalRatings} reviews)</Text>
+            </View>
+            <Text style={s.ratingArrow}>See all →</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Join Queue CTA */}
         {open ? (
-          <TouchableOpacity style={s.cta} onPress={() => navigation.navigate("CheckIn", {
-            salon: {
-              id: salon.id,
-              name: salon.name,
-              services: salon.services || [],
-              stylists: salon.stylists || [],
-              queueCount: liveQueueCount,
-              avgWaitMin: salon.avgWaitMin ?? 0,
-            },
-          })}>
+          <TouchableOpacity style={s.cta} onPress={() => navigation.navigate("CheckIn", { salon })}>
             <Text style={s.ctaText}>Join Queue →</Text>
-            <Text style={s.ctaSub}>{liveQueueCount} people ahead</Text>
+            {salon.queueCount !== undefined && (
+              <Text style={s.ctaSub}>{salon.queueCount} people ahead</Text>
+            )}
           </TouchableOpacity>
         ) : (
           <View style={s.closedBanner}>
@@ -95,7 +103,7 @@ export default function SalonDetailScreen({ route, navigation }) {
         </View>
 
         <View style={s.section}>
-          {/* Services tab */}
+          {/* Services */}
           {tab === "services" && (
             <>
               {(salon.services || []).map((sv) => (
@@ -111,7 +119,7 @@ export default function SalonDetailScreen({ route, navigation }) {
             </>
           )}
 
-          {/* Stylists tab */}
+          {/* Stylists */}
           {tab === "stylists" && (
             <>
               {!open && (
@@ -138,13 +146,13 @@ export default function SalonDetailScreen({ route, navigation }) {
             </>
           )}
 
-          {/* Hours tab */}
+          {/* Hours */}
           {tab === "hours" && DAYS.map((d, i) => {
-            const h = salon.hours?.[d];
+            const h       = salon.hours?.[d];
             const isToday = ["sun","mon","tue","wed","thu","fri","sat"][new Date().getDay()] === d;
             return (
               <View key={d} style={[s.row, isToday && s.todayRow]}>
-                <Text style={[s.rowTitle, { flex: 0.5 }, isToday && { color: "#1a1a2e", fontWeight: "800" }]}>
+                <Text style={[s.rowTitle, { flex: 0.5 }, isToday && { fontWeight: "800" }]}>
                   {DAY_LABELS[i]} {isToday ? "📍" : ""}
                 </Text>
                 <Text style={[s.rowSub, isToday && { color: "#1a1a2e", fontWeight: "600" }]}>
@@ -170,6 +178,12 @@ const s = StyleSheet.create({
   statusRow:        { flexDirection: "row", alignItems: "center", marginTop: 10 },
   statusDot:        { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   waitText:         { fontSize: 13, color: "#6b7280" },
+  ratingRow:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  ratingLeft:       { flexDirection: "row", alignItems: "center", gap: 6 },
+  ratingStar:       { fontSize: 20, color: "#F59E0B" },
+  ratingValue:      { fontSize: 16, fontWeight: "800", color: "#1a1a2e" },
+  ratingCount:      { fontSize: 13, color: "#6b7280" },
+  ratingArrow:      { fontSize: 13, color: "#1a1a2e", fontWeight: "600" },
   cta:              { margin: 16, backgroundColor: "#1a1a2e", borderRadius: 16, paddingVertical: 18, alignItems: "center" },
   ctaText:          { color: "#fff", fontSize: 17, fontWeight: "800" },
   ctaSub:           { color: "#9ca3af", fontSize: 12, marginTop: 2 },

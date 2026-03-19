@@ -5,16 +5,18 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Text, ActivityIndicator, View } from "react-native";
 
-import HomeScreen         from "../screens/HomeScreen";
-import SalonDetailScreen  from "../screens/SalonDetailScreen";
-import CheckInScreen      from "../screens/CheckInScreen";
-import QueueTrackerScreen from "../screens/QueueTrackerScreen";
-import ReceiptScreen      from "../screens/ReceiptScreen";
+import HomeScreen           from "../screens/HomeScreen";
+import SalonDetailScreen    from "../screens/SalonDetailScreen";
+import CheckInScreen        from "../screens/CheckInScreen";
+import QueueTrackerScreen   from "../screens/QueueTrackerScreen";
 import ProfileScreen        from "../screens/ProfileScreen";
 import LoginScreen          from "../screens/LoginScreen";
 import HistoryScreen        from "../screens/HistoryScreen";
+import ReceiptScreen        from "../screens/ReceiptScreen";
 import FamilyMembersScreen  from "../screens/FamilyMembersScreen";
-import { useAuth }        from "../hooks/useAuth";
+import ReviewScreen         from "../screens/ReviewScreen";
+import ReviewsScreen        from "../screens/ReviewsScreen";
+import { useAuth }          from "../hooks/useAuth";
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
@@ -25,15 +27,7 @@ function ExploreStack() {
       <Stack.Screen name="Home"        component={HomeScreen} />
       <Stack.Screen name="SalonDetail" component={SalonDetailScreen} />
       <Stack.Screen name="CheckIn"     component={CheckInScreen} />
-    </Stack.Navigator>
-  );
-}
-
-function QueueStack() {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="QueueTracker" component={QueueTrackerScreen} />
-      <Stack.Screen name="Receipt"      component={ReceiptScreen} />
+      <Stack.Screen name="Reviews"     component={ReviewsScreen} />
     </Stack.Navigator>
   );
 }
@@ -44,6 +38,16 @@ function ProfileStack() {
       <Stack.Screen name="ProfileMain"   component={ProfileScreen} />
       <Stack.Screen name="History"       component={HistoryScreen} />
       <Stack.Screen name="FamilyMembers" component={FamilyMembersScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function QueueStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="QueueTracker" component={QueueTrackerScreen} />
+      <Stack.Screen name="Receipt"      component={ReceiptScreen} />
+      <Stack.Screen name="Review"       component={ReviewScreen} />
     </Stack.Navigator>
   );
 }
@@ -60,7 +64,7 @@ function MainTabs() {
         ),
         tabBarActiveTintColor:   "#1a1a2e",
         tabBarInactiveTintColor: "#9ca3af",
-        tabBarStyle:             { height: 60, paddingBottom: 8 },
+        tabBarStyle: { height: 60, paddingBottom: 8 },
       })}
     >
       <Tab.Screen name="Explore" component={ExploreStack} />
@@ -85,7 +89,7 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
-          <Stack.Screen name="Main"  component={MainTabs} />
+          <Stack.Screen name="Main" component={MainTabs} />
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />
         )}

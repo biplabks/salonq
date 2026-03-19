@@ -14,6 +14,7 @@ import SalonLogin          from "./src/screens/SalonLogin";
 import SalonRegisterScreen from "./src/screens/SalonRegisterScreen";
 import SalonSettingsScreen from "./src/screens/SalonSettingsScreen";
 import AnalyticsScreen     from "./src/screens/AnalyticsScreen";
+import ReviewsScreen       from "./src/screens/ReviewsScreen";
 
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -85,6 +86,7 @@ export default function App() {
               {route.name === "Queue"     ? "⏳"
              : route.name === "Stylists"  ? "💇"
              : route.name === "Analytics" ? "📊"
+             : route.name === "Reviews"   ? "⭐"
              : "⚙️"}
             </Text>
           ),
@@ -101,6 +103,9 @@ export default function App() {
         </Tab.Screen>
         <Tab.Screen name="Analytics">
           {() => <AnalyticsScreen salonId={salonId} salon={salon} />}
+        </Tab.Screen>
+        <Tab.Screen name="Reviews">
+          {() => <ReviewsScreen salonId={salonId} salon={salon} />}
         </Tab.Screen>
         <Tab.Screen name="Settings">
           {() => <SalonSettingsScreen salon={salon} salonId={salonId} />}

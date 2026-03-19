@@ -30,7 +30,7 @@ export default function ReceiptScreen({ route, navigation }) {
       if (snap.exists()) setSalon({ id: snap.id, ...snap.data() });
     });
 
-    // Subscribe to queue entry in real-time to detect payment confirmation
+    // Subscribe to queue entry in real-time
     const unsub = onSnapshot(
       doc(db, "salons", salonId, "queue", entryId),
       (snap) => {
@@ -41,7 +41,7 @@ export default function ReceiptScreen({ route, navigation }) {
           // Animate checkmark when payment confirmed
           if (snap.data().paymentStatus === "paid") {
             Animated.spring(checkAnim, {
-              toValue: 1,
+              toValue:  1,
               friction: 4,
               useNativeDriver: true,
             }).start();
@@ -53,8 +53,10 @@ export default function ReceiptScreen({ route, navigation }) {
   }, []);
 
   const subtotal    = (entry?.services || []).reduce((s, sv) => s + (sv.price || 0), 0);
-  const discountAmt = appliedPromo ? Math.round(subtotal * (appliedPromo.discountPercent / 100)) : 0;
-  const total       = subtotal - discountAmt;
+  const discountAmt = appliedPromo
+    ? Math.round(subtotal * (appliedPromo.discountPercent / 100))
+    : (entry?.discountAmount || 0);
+  const total       = entry?.totalAfterDiscount || (subtotal - discountAmt);
   const isPaid      = entry?.paymentStatus === "paid";
   const paymentMethod = entry?.paymentMethod || null;
 
@@ -83,7 +85,6 @@ export default function ReceiptScreen({ route, navigation }) {
         setPromoError(`❌ Minimum spend of ${formatPrice(promo.minSpend)} required`); return;
       }
 
-      // Apply promo
       setAppliedPromo(promo);
       setPromoError("");
 
@@ -99,12 +100,12 @@ export default function ReceiptScreen({ route, navigation }) {
       );
       await updateDoc(doc(db, "salons", salonId), { promoCodes: updatedPromos });
 
-      // Save applied promo to entry so salon staff can see it
+      const discAmt = Math.round(subtotal * (promo.discountPercent / 100));
       await updateDoc(doc(db, "salons", salonId, "queue", entryId), {
         promoCode:          code,
         discountPercent:    promo.discountPercent,
-        discountAmount:     Math.round(subtotal * (promo.discountPercent / 100)),
-        totalAfterDiscount: subtotal - Math.round(subtotal * (promo.discountPercent / 100)),
+        discountAmount:     discAmt,
+        totalAfterDiscount: subtotal - discAmt,
       });
 
     } catch (err) {
@@ -119,8 +120,8 @@ export default function ReceiptScreen({ route, navigation }) {
     setPromoCode("");
     setPromoError("");
     await updateDoc(doc(db, "salons", salonId, "queue", entryId), {
-      promoCode: null, discountPercent: 0, discountAmount: 0,
-      totalAfterDiscount: subtotal,
+      promoCode: null, discountPercent: 0,
+      discountAmount: 0, totalAfterDiscount: subtotal,
     });
   };
 
@@ -139,6 +140,7 @@ export default function ReceiptScreen({ route, navigation }) {
           }]}>
             <Text style={s.checkMark}>✓</Text>
           </Animated.View>
+
           <Text style={s.paidTitle}>Payment Confirmed!</Text>
           <Text style={s.paidSub}>Thank you for visiting {salonName}</Text>
 
@@ -153,10 +155,12 @@ export default function ReceiptScreen({ route, navigation }) {
                 <Text style={s.paidValue}>{paymentMethod}</Text>
               </View>
             )}
-            {appliedPromo && (
+            {(appliedPromo || entry?.promoCode) && (
               <View style={s.paidRow}>
                 <Text style={[s.paidLabel, { color: "#16a34a" }]}>Discount applied</Text>
-                <Text style={[s.paidValue, { color: "#16a34a" }]}>-{formatPrice(discountAmt)}</Text>
+                <Text style={[s.paidValue, { color: "#16a34a" }]}>
+                  -{formatPrice(discountAmt)}
+                </Text>
               </View>
             )}
             <View style={s.paidRow}>
@@ -164,6 +168,28 @@ export default function ReceiptScreen({ route, navigation }) {
               <Text style={s.paidValue}>{formatDate(entry?.completedAt)}</Text>
             </View>
           </View>
+
+          {/* Review button — shown only if not yet reviewed */}
+          {!entry?.reviewed && (
+            <TouchableOpacity
+              style={s.reviewBtn}
+              onPress={() => navigation.navigate("Review", {
+                salonId,
+                entryId,
+                salonName,
+                stylistId:   entry?.stylistId   || null,
+                stylistName: entry?.stylistName  || null,
+              })}
+            >
+              <Text style={s.reviewBtnText}>⭐ Leave a Review</Text>
+            </TouchableOpacity>
+          )}
+
+          {entry?.reviewed && (
+            <View style={s.reviewedBadge}>
+              <Text style={s.reviewedText}>✅ You've reviewed this visit</Text>
+            </View>
+          )}
 
           <TouchableOpacity
             style={s.doneBtn}
@@ -211,12 +237,15 @@ export default function ReceiptScreen({ route, navigation }) {
             <Text style={s.summaryLabel}>Subtotal</Text>
             <Text style={s.summaryValue}>{formatPrice(subtotal)}</Text>
           </View>
-          {appliedPromo && (
+          {(appliedPromo || entry?.promoCode) && (
             <View style={s.summaryRow}>
               <Text style={[s.summaryLabel, { color: "#16a34a" }]}>
-                Discount ({appliedPromo.discountPercent}% — {appliedPromo.code})
+                Discount ({appliedPromo?.discountPercent || entry?.discountPercent}%
+                — {appliedPromo?.code || entry?.promoCode})
               </Text>
-              <Text style={[s.summaryValue, { color: "#16a34a" }]}>-{formatPrice(discountAmt)}</Text>
+              <Text style={[s.summaryValue, { color: "#16a34a" }]}>
+                -{formatPrice(discountAmt)}
+              </Text>
             </View>
           )}
           <View style={s.divider} />
@@ -227,7 +256,7 @@ export default function ReceiptScreen({ route, navigation }) {
         </View>
 
         {/* Promo code */}
-        {!appliedPromo ? (
+        {!appliedPromo && !entry?.promoCode ? (
           <View style={s.promoCard}>
             <Text style={s.cardTitle}>Have a promo code?</Text>
             <View style={s.promoRow}>
@@ -250,11 +279,14 @@ export default function ReceiptScreen({ route, navigation }) {
         ) : (
           <View style={s.promoAppliedCard}>
             <Text style={s.promoAppliedText}>
-              🎉 {appliedPromo.code} — {appliedPromo.discountPercent}% off!
+              🎉 {appliedPromo?.code || entry?.promoCode} —
+              {appliedPromo?.discountPercent || entry?.discountPercent}% off!
             </Text>
-            <TouchableOpacity onPress={handleRemovePromo}>
-              <Text style={s.promoRemove}>Remove</Text>
-            </TouchableOpacity>
+            {appliedPromo && (
+              <TouchableOpacity onPress={handleRemovePromo}>
+                <Text style={s.promoRemove}>Remove</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -324,16 +356,20 @@ const s = StyleSheet.create({
   paymentMethodText:  { fontSize: 13, color: "#374151", fontWeight: "500" },
   awaitingHint:       { fontSize: 12, color: "#9ca3af", textAlign: "center" },
 
-  // Payment confirmed screen
+  // Payment confirmed styles
   paidScreen:         { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28 },
   checkCircle:        { width: 100, height: 100, borderRadius: 50, backgroundColor: "#16a34a", alignItems: "center", justifyContent: "center", marginBottom: 24, shadowColor: "#16a34a", shadowOpacity: 0.4, shadowRadius: 20, elevation: 8 },
   checkMark:          { fontSize: 52, color: "#fff", fontWeight: "800" },
   paidTitle:          { fontSize: 26, fontWeight: "900", color: "#1a1a2e", marginBottom: 8 },
-  paidSub:            { fontSize: 14, color: "#6b7280", marginBottom: 28, textAlign: "center" },
-  paidReceipt:        { backgroundColor: "#fff", borderRadius: 16, padding: 20, borderWidth: 1, borderColor: "#e5e7eb", width: "100%", marginBottom: 24 },
+  paidSub:            { fontSize: 14, color: "#6b7280", marginBottom: 24, textAlign: "center" },
+  paidReceipt:        { backgroundColor: "#fff", borderRadius: 16, padding: 20, borderWidth: 1, borderColor: "#e5e7eb", width: "100%", marginBottom: 16 },
   paidRow:            { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f9fafb" },
   paidLabel:          { fontSize: 14, color: "#6b7280" },
   paidValue:          { fontSize: 14, fontWeight: "700", color: "#1a1a2e" },
-  doneBtn:            { backgroundColor: "#1a1a2e", borderRadius: 14, paddingVertical: 16, paddingHorizontal: 40, alignItems: "center" },
+  reviewBtn:          { backgroundColor: "#fef9c3", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32, alignItems: "center", borderWidth: 1.5, borderColor: "#F59E0B", marginBottom: 10, width: "100%" },
+  reviewBtnText:      { color: "#d97706", fontSize: 15, fontWeight: "700" },
+  reviewedBadge:      { backgroundColor: "#dcfce7", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 12 },
+  reviewedText:       { fontSize: 13, color: "#16a34a", fontWeight: "600" },
+  doneBtn:            { backgroundColor: "#1a1a2e", borderRadius: 14, paddingVertical: 16, paddingHorizontal: 40, alignItems: "center", width: "100%" },
   doneBtnText:        { color: "#fff", fontSize: 16, fontWeight: "700" },
 });
