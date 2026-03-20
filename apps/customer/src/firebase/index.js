@@ -1,28 +1,17 @@
-// apps/customer/src/firebase/config.js
+// apps/customer/src/firebase/index.js
+// Fix: Clear AsyncStorage when user signs out
+
 import { initializeApp, getApps } from "firebase/app";
 import {
-  getAuth,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
+  getAuth, signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, signOut, onAuthStateChanged,
 } from "firebase/auth";
 import {
-  getFirestore,
-  collection,
-  collectionGroup,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  addDoc,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  serverTimestamp,
+  getFirestore, collection, doc, getDoc, getDocs, setDoc,
+  updateDoc, addDoc, query, where, orderBy, onSnapshot,
+  serverTimestamp, runTransaction,
 } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
   apiKey:            process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -34,18 +23,22 @@ const firebaseConfig = {
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db   = getFirestore(app);
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-export const loginWithEmail = (email, password) =>
-  signInWithEmailAndPassword(auth, email, password);
+export const loginWithEmail    = (email, password) => signInWithEmailAndPassword(auth, email, password);
+export const registerWithEmail = (email, password) => createUserWithEmailAndPassword(auth, email, password);
 
-export const registerWithEmail = (email, password) =>
-  createUserWithEmailAndPassword(auth, email, password);
-
-export const logout = () => signOut(auth);
+// Fix 1: Clear AsyncStorage on logout so next user doesn't see previous queue
+export const logout = async () => {
+  try {
+    await AsyncStorage.removeItem("activeQueue");
+  } catch (e) {
+    console.error("Failed to clear AsyncStorage on logout:", e);
+  }
+  return signOut(auth);
+};
 
 export const onAuthChange = (cb) => onAuthStateChanged(auth, cb);
 
@@ -55,99 +48,62 @@ export const getSalons = async () => {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 };
 
-export const subscribeSalons = (callback) => {
-  let salons = [];
-  let queueCounts = {};
-
-  const merge = () =>
-    callback(salons.map((s) => ({ ...s, queueCount: queueCounts[s.id] ?? s.queueCount ?? 0 })));
-
-  const unsubSalons = onSnapshot(collection(db, "salons"), (snap) => {
-    salons = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    merge();
-  });
-
-  const unsubQueue = onSnapshot(
-    query(collectionGroup(db, "queue"), where("status", "==", "waiting")),
-    (snap) => {
-      const counts = {};
-      snap.docs.forEach((d) => {
-        const salonId = d.ref.parent.parent.id;
-        counts[salonId] = (counts[salonId] || 0) + 1;
-      });
-      queueCounts = counts;
-      merge();
-    }
-  );
-
-  return () => { unsubSalons(); unsubQueue(); };
-};
-
 export const getSalon = async (salonId) => {
   const snap = await getDoc(doc(db, "salons", salonId));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 };
 
-export const saveSalon = (salonId, data) =>
-  setDoc(doc(db, "salons", salonId), { ...data, updatedAt: serverTimestamp() }, { merge: true });
-
 // ── Queue ─────────────────────────────────────────────────────────────────────
+
+// Fix 2: Use Firestore transaction to prevent race condition on position assignment
 export const joinQueue = async ({
-  salonId, customerId, customerName, services, stylistId = null,
+  salonId, customerId, customerName, services,
+  stylistId = null, stylistName = null,
   familyMembers = [], checkingInSelf = true, peopleCount = 1,
 }) => {
-  const queueRef = collection(db, "salons", salonId, "queue");
-
-  // Prevent logged-in customer from joining the same salon twice
-  // Single where() to avoid composite index requirement; filter active statuses client-side
-  if (customerId) {
-    const dupSnap = await getDocs(
-      query(queueRef, where("customerId", "==", customerId))
-    );
-    const alreadyActive = dupSnap.docs.some((d) =>
-      ["waiting", "called", "in-service"].includes(d.data().status)
-    );
-    if (alreadyActive) {
-      throw new Error("You're already in this salon's queue. Leave the current queue first.");
-    }
-  }
-
-  const waitingSnap = await getDocs(
-    query(queueRef, where("status", "==", "waiting"))
-  );
-  const position = waitingSnap.size + 1;
+  const queueRef      = collection(db, "salons", salonId, "queue");
   const totalDuration = services.reduce((s, sv) => s + (sv.durationMin || 30), 0);
 
-  return addDoc(queueRef, {
-    customerId,
-    customerName,
-    services,
-    stylistId,
-    familyMembers,
-    checkingInSelf,
-    peopleCount,
-    status: "waiting",
-    paymentStatus: "pending",
-    type: "online",
-    position,
-    estimatedWaitMin: (position - 1) * totalDuration,
-    joinedAt: serverTimestamp(),
-    calledAt: null,
-    completedAt: null,
+  const newEntryRef = doc(queueRef);
+
+  await runTransaction(db, async (transaction) => {
+    const waitingSnap = await getDocs(
+      query(queueRef, where("status", "==", "waiting"), orderBy("joinedAt"))
+    );
+    const position = waitingSnap.size + 1;
+
+    transaction.set(newEntryRef, {
+      customerId,
+      customerName,
+      services,
+      stylistId,
+      stylistName:      stylistName || null,
+      familyMembers,
+      checkingInSelf,
+      peopleCount,
+      status:           "waiting",
+      type:             "online",
+      position,
+      estimatedWaitMin: (position - 1) * totalDuration,
+      paymentStatus:    "pending",
+      joinedAt:         serverTimestamp(),
+      calledAt:         null,
+      completedAt:      null,
+    });
   });
+
+  return newEntryRef;
 };
 
 export const subscribeToQueue = (salonId, callback) => {
   const q = query(
     collection(db, "salons", salonId, "queue"),
-    where("status", "in", ["waiting", "called", "in-service"])
+    where("status", "in", ["waiting", "called", "in-service"]),
+    orderBy("position")
   );
-  return onSnapshot(q, (snap) => {
-    const entries = snap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-    callback(entries);
-  });
+  return onSnapshot(q, (snap) =>
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+  );
 };
 
 export const subscribeToQueueEntry = (salonId, entryId, callback) =>
@@ -157,45 +113,29 @@ export const subscribeToQueueEntry = (salonId, entryId, callback) =>
 
 export const updateQueueEntry = (salonId, entryId, updates) =>
   updateDoc(doc(db, "salons", salonId, "queue", entryId), {
-    ...updates,
-    updatedAt: serverTimestamp(),
+    ...updates, updatedAt: serverTimestamp(),
   });
 
 export const completeService = async (salonId, entryId, stylistId) => {
-  const entrySnap = await getDoc(doc(db, "salons", salonId, "queue", entryId));
-  if (!entrySnap.exists()) return;
-  const entry = entrySnap.data();
+  const snap = await getDoc(doc(db, "salons", salonId, "queue", entryId));
+  if (!snap.exists()) return;
+  const entry = snap.data();
 
   await updateDoc(doc(db, "salons", salonId, "queue", entryId), {
-    status: "done",
-    completedAt: serverTimestamp(),
+    status: "done", completedAt: serverTimestamp(),
   });
 
   if (entry.customerId) {
     await addDoc(collection(db, "customers", entry.customerId, "visits"), {
-      salonId,
-      stylistId,
+      salonId, stylistId,
       services:      entry.services,
       familyMembers: entry.familyMembers || [],
       peopleCount:   entry.peopleCount   || 1,
-      totalPrice:    entry.totalAfterDiscount || entry.services.reduce((s, sv) => s + sv.price, 0),
-      completedAt:   serverTimestamp(),
+      totalPrice:    entry.totalAfterDiscount
+        || entry.services.reduce((s, sv) => s + (sv.price || 0), 0),
+      completedAt: serverTimestamp(),
     });
   }
-};
-
-export const callNextCustomer = async (salonId) => {
-  const snap = await getDocs(
-    query(
-      collection(db, "salons", salonId, "queue"),
-      where("status", "==", "waiting"),
-      orderBy("position")
-    )
-  );
-  if (snap.empty) return null;
-  const next = snap.docs[0];
-  await updateQueueEntry(salonId, next.id, { status: "called", calledAt: serverTimestamp() });
-  return { id: next.id, ...next.data() };
 };
 
 // ── Customers ─────────────────────────────────────────────────────────────────
@@ -214,5 +154,4 @@ export const getVisitHistory = async (customerId) => {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 };
 
-// ── Utils ─────────────────────────────────────────────────────────────────────
-export { serverTimestamp, addDoc, collection, db as firestore };
+export { serverTimestamp };

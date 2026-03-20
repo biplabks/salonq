@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, SafeAreaView,
+  ActivityIndicator, Alert, SafeAreaView, BackHandler, Platform,
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -39,6 +39,32 @@ export default function CheckInScreen({ route, navigation }) {
       });
     }
   }, []);
+
+  // Android back button — confirm before cancelling
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const onBack = () => {
+      const hasSelections = selectedServices.length > 0 || selectedMembers.length > 0;
+      if (step === 1 && hasSelections) {
+        Alert.alert(
+          "Cancel check-in?",
+          "You have unsaved selections. Are you sure you want to go back?",
+          [
+            { text: "Stay", style: "cancel" },
+            { text: "Leave", style: "destructive", onPress: () => navigation.goBack() },
+          ]
+        );
+        return true; // prevent default back
+      }
+      if (step > 1) {
+        setStep(step - 1);
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
+    return () => sub.remove();
+  }, [step, selectedServices, selectedMembers]);
 
   const toggleService = (service) =>
     setSelectedServices((prev) =>

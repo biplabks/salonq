@@ -161,6 +161,7 @@ export default function QueueTrackerScreen({ route, navigation }) {
   const statusLabel = STATUS_LABELS[entry.status] || entry.status;
   const isCalled    = entry.status === "called";
   const isDone      = entry.status === "done" || entry.status === "no-show";
+  const isNext      = entry.position === 1 && entry.status === "waiting";
 
   return (
     <SafeAreaView style={s.container}>
@@ -170,21 +171,27 @@ export default function QueueTrackerScreen({ route, navigation }) {
       {/* Status card */}
       <Animated.View style={[
         s.card,
-        { borderColor: statusColor },
-        isCalled && { transform: [{ scale: pulseAnim }] },
+        { borderColor: isNext ? "#16a34a" : statusColor },
+        (isCalled || isNext) && { transform: [{ scale: pulseAnim }] },
       ]}>
         <View style={[s.statusBadge, { backgroundColor: statusColor + "22" }]}>
           <Text style={[s.statusText, { color: statusColor }]}>{statusLabel}</Text>
         </View>
 
-        {!isDone && <>
-          <Text style={s.posLabel}>Position</Text>
-          <Text style={s.posNum}>#{entry.position}</Text>
-          <Text style={s.waitLabel}>Estimated wait</Text>
-          <Text style={[s.waitTime, { color: statusColor }]}>
-            {formatWait(entry.estimatedWaitMin)}
-          </Text>
-        </>}
+        {!isDone && (
+          isNext ? (
+            <Text style={s.nextText}>You're next! 🎉</Text>
+          ) : (
+            <>
+              <Text style={s.posLabel}>Position</Text>
+              <Text style={s.posNum}>#{entry.position}</Text>
+              <Text style={s.waitLabel}>Estimated wait</Text>
+              <Text style={[s.waitTime, { color: statusColor }]}>
+                {formatWait(entry.estimatedWaitMin)}
+              </Text>
+            </>
+          )
+        )}
 
         {isDone && (
           <Text style={s.doneText}>
@@ -254,6 +261,7 @@ const s = StyleSheet.create({
   waitLabel:      { fontSize: 13, color: "#9ca3af", marginTop: 8, marginBottom: 2 },
   waitTime:       { fontSize: 28, fontWeight: "800" },
   joinedAt:       { fontSize: 12, color: "#9ca3af", marginTop: 16 },
+  nextText:       { fontSize: 28, fontWeight: "900", color: "#16a34a", textAlign: "center" },
   doneText:       { fontSize: 20, fontWeight: "700", color: "#1a1a2e", textAlign: "center" },
   summaryCard:    { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: "#e5e7eb" },
   summaryTitle:   { fontSize: 13, color: "#6b7280", marginBottom: 10, fontWeight: "600" },

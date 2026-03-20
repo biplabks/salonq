@@ -8,7 +8,7 @@ import {
   ActivityIndicator, Alert, ScrollView, SafeAreaView, Platform,
 } from "react-native";
 import { getAuth } from "firebase/auth";
-import { createSalon, linkStaffToSalon } from "../firebase";
+import { createSalon, linkStaffToSalon, getSalon } from "../firebase";
 import LocationPickerWeb from "../components/LocationPickerWeb";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -31,7 +31,9 @@ export default function SalonRegisterScreen({ onSalonCreated }) {
   const [location, setLocation] = useState({ lat: 0, lng: 0 });
 
   // Existing salon
-  const [salonId,  setSalonId]  = useState("");
+  const [salonId,   setSalonId]   = useState("");
+  const [foundSalon, setFoundSalon] = useState(null);
+  const [finding,    setFinding]    = useState(false);
 
   const user = getAuth().currentUser;
 
@@ -77,16 +79,36 @@ export default function SalonRegisterScreen({ onSalonCreated }) {
     }
   };
 
-  const handleJoinSalon = async () => {
+  const handleFindSalon = async () => {
     if (!salonId.trim()) {
-      if (Platform.OS === "web") window.alert("Please enter your salon ID.");
-      else Alert.alert("Missing Salon ID", "Please enter your salon ID.");
+      if (Platform.OS === "web") window.alert("Please enter a salon ID.");
+      else Alert.alert("Missing Salon ID", "Please enter a salon ID.");
       return;
     }
+    setFinding(true);
+    setFoundSalon(null);
+    try {
+      const salon = await getSalon(salonId.trim());
+      if (salon) {
+        setFoundSalon(salon);
+      } else {
+        if (Platform.OS === "web") window.alert("No salon found with that ID. Please check and try again.");
+        else Alert.alert("Not found", "No salon found with that ID. Please check and try again.");
+      }
+    } catch (err) {
+      if (Platform.OS === "web") window.alert(`Error: ${err.message}`);
+      else Alert.alert("Error", err.message);
+    } finally {
+      setFinding(false);
+    }
+  };
+
+  const handleJoinSalon = async () => {
+    if (!foundSalon) return;
     setLoading(true);
     try {
-      await linkStaffToSalon(user.uid, salonId.trim(), user.email);
-      onSalonCreated(salonId.trim());
+      await linkStaffToSalon(user.uid, foundSalon.id, user.email);
+      onSalonCreated(foundSalon.id);
     } catch (err) {
       if (Platform.OS === "web") window.alert(`Error: ${err.message}`);
       else Alert.alert("Error", err.message);
@@ -157,17 +179,45 @@ export default function SalonRegisterScreen({ onSalonCreated }) {
         {tab === "existing" && (
           <View>
             <Text style={s.label}>Salon ID</Text>
-            <TextInput
-              style={s.input}
-              placeholder="Paste your salon ID here"
-              value={salonId}
-              onChangeText={setSalonId}
-              autoCapitalize="none"
-            />
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TextInput
+                style={[s.input, { flex: 1, marginBottom: 0 }]}
+                placeholder="Paste your salon ID here"
+                value={salonId}
+                onChangeText={(v) => { setSalonId(v); setFoundSalon(null); }}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={[s.findBtn, (!salonId.trim() || finding) && { opacity: 0.5 }]}
+                onPress={handleFindSalon}
+                disabled={!salonId.trim() || finding}
+              >
+                {finding
+                  ? <ActivityIndicator color="#1a1a2e" size="small" />
+                  : <Text style={s.findBtnText}>Find</Text>
+                }
+              </TouchableOpacity>
+            </View>
             <Text style={s.note}>
               📝 Ask your salon owner for the Salon ID. It looks like: Sbv44JaRTy8n3sWGX0rb
             </Text>
-            <TouchableOpacity style={s.btn} onPress={handleJoinSalon} disabled={loading}>
+
+            {foundSalon && (
+              <View style={s.previewCard}>
+                <Text style={s.previewEmoji}>✂️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.previewName}>{foundSalon.name}</Text>
+                  <Text style={s.previewAddr}>{foundSalon.address}</Text>
+                </View>
+                <Text style={s.previewCheck}>✓</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[s.btn, !foundSalon && { opacity: 0.4 }]}
+              onPress={handleJoinSalon}
+              disabled={loading || !foundSalon}
+            >
               {loading
                 ? <ActivityIndicator color="#fff" />
                 : <Text style={s.btnText}>Join Salon →</Text>
@@ -196,4 +246,11 @@ const s = StyleSheet.create({
   note:            { fontSize: 12, color: "#6b7280", marginTop: 12, marginBottom: 4, lineHeight: 18 },
   btn:             { backgroundColor: "#fff", borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 20 },
   btnText:         { color: "#1a1a2e", fontSize: 16, fontWeight: "800" },
+  findBtn:         { backgroundColor: "#fff", borderRadius: 12, paddingHorizontal: 16, justifyContent: "center", alignItems: "center", minWidth: 64 },
+  findBtnText:     { color: "#1a1a2e", fontSize: 14, fontWeight: "800" },
+  previewCard:     { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#ffffff20", borderRadius: 12, padding: 14, marginTop: 14, borderWidth: 1, borderColor: "#16a34a60" },
+  previewEmoji:    { fontSize: 28 },
+  previewName:     { fontSize: 15, fontWeight: "700", color: "#fff" },
+  previewAddr:     { fontSize: 12, color: "#9ca3af", marginTop: 2 },
+  previewCheck:    { fontSize: 20, color: "#16a34a" },
 });

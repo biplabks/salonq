@@ -6,8 +6,10 @@ import {
 } from "react-native";
 import { getSalon } from "../firebase";
 import { formatWait, isSalonOpen, formatPrice, DAYS, DAY_LABELS } from "../utils";
+import { useCurrentTime } from "../hooks/useCurrentTime";
 
 export default function SalonDetailScreen({ route, navigation }) {
+  const now      = useCurrentTime();
   const { salonId } = route.params;
   const [salon,   setSalon]   = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,7 +22,7 @@ export default function SalonDetailScreen({ route, navigation }) {
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#1a1a2e" /></View>;
   if (!salon)  return <View style={s.center}><Text>Salon not found.</Text></View>;
 
-  const open = isSalonOpen(salon.hours);
+  const open = isSalonOpen(salon.hours, now);
 
   const stylists = (salon.stylists || []).map((st) => ({
     ...st, status: open ? st.status : "off",

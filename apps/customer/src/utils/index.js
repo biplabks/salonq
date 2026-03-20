@@ -27,10 +27,8 @@ export const formatPrice = (amount) =>
     minimumFractionDigits: 0,
   }).format(amount);
 
-export const isSalonOpen = (hours) => {
+export const isSalonOpen = (hours, now = new Date()) => {
   if (!hours) return false;
-
-  const now = new Date();
   const days = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
   const day = days[now.getDay()];
   const h = hours[day];

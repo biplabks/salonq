@@ -9,6 +9,7 @@ import * as Location from "expo-location";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../firebase";
 import { formatWait, isSalonOpen, distanceKm } from "../utils";
+import { useCurrentTime } from "../hooks/useCurrentTime";
 
 // Default center — Dhaka, Bangladesh
 const DEFAULT_REGION = {
@@ -19,6 +20,7 @@ const DEFAULT_REGION = {
 };
 
 export default function HomeScreen({ navigation }) {
+  const now      = useCurrentTime();
   const [salons,   setSalons]   = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search,   setSearch]   = useState("");
@@ -82,7 +84,7 @@ export default function HomeScreen({ navigation }) {
 
 // ── List item ──────────────────────────────────────────────────────────────
   const renderSalon = ({ item }) => {
-    const open     = isSalonOpen(item.hours);
+    const open     = isSalonOpen(item.hours, now);
     const distance = getDistance(item);
     return (
       <TouchableOpacity
