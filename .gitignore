@@ -18,11 +18,16 @@ ios/
 *.key
 *.mobileprovision
 .env
-.env.local
-.env*.local
-scripts/service-account.json
+.env.*
+**/.env
+**/.env.*
+**/service-account*.json
+**/serviceAccount*.json
+**/credentials*.json
 google-services.json
+**/google-services.json
 GoogleService-Info.plist
+**/GoogleService-Info.plist
 
 # OS
 .DS_Store

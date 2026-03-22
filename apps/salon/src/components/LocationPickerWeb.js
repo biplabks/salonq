@@ -113,6 +113,9 @@ export default function LocationPickerWeb({ value, onChange, darkMode = false })
             : <Text style={[s.locBtnText, darkMode && s.locBtnTextDark]}>📍 Use my location</Text>
           }
         </TouchableOpacity>
+        <Text style={[s.locationNote, darkMode && s.locationNoteDark]}>
+          Please click here to get accurate location
+        </Text>
         {coords && (
           <Text style={[s.coordsText, darkMode && s.coordsTextDark]}>
             {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
@@ -144,6 +147,8 @@ const s = StyleSheet.create({
   locBtnDark:      { backgroundColor: "#ffffff20", borderWidth: 1, borderColor: "#ffffff30" },
   locBtnText:      { color: "#1a1a2e", fontSize: 13, fontWeight: "600" },
   locBtnTextDark:  { color: "#fff" },
+  locationNote:     { fontSize: 11, color: "#6b7280", marginLeft: 8, flex: 1 },
+  locationNoteDark: { color: "#9ca3af" },
   coordsText:      { fontSize: 11, color: "#6b7280" },
   coordsTextDark:  { fontSize: 11, color: "#9ca3af" },
   loading:         { alignItems: "center", marginTop: 8 },

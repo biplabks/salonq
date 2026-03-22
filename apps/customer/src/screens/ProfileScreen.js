@@ -46,7 +46,10 @@ export default function ProfileScreen({ navigation }) {
     return <View style={s.center}><ActivityIndicator color="#1a1a2e" /></View>;
   }
 
-  const name  = customer?.name  || user?.displayName || user?.email || "Guest";
+  const rawName = customer?.name || user?.displayName || "";
+  const name = rawName.includes("@")
+    ? (rawName.split("@")[0] || "").replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Guest"
+    : rawName || "Guest";
   const email = customer?.email || user?.email;
   const phone = customer?.phone;
 

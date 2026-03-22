@@ -9,7 +9,7 @@ import {
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc,
   updateDoc, addDoc, query, where, orderBy, onSnapshot,
-  serverTimestamp, runTransaction,
+  serverTimestamp, getCountFromServer,
 } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -55,41 +55,39 @@ export const getSalon = async (salonId) => {
 
 // ── Queue ─────────────────────────────────────────────────────────────────────
 
-// Fix 2: Use Firestore transaction to prevent race condition on position assignment
 export const joinQueue = async ({
   salonId, customerId, customerName, services,
   stylistId = null, stylistName = null,
-  familyMembers = [], checkingInSelf = true, peopleCount = 1,
+  groupMembers = [], isGroupBooking = false,
+  peopleCount = 1, totalPrice = null,
 }) => {
   const queueRef      = collection(db, "salons", salonId, "queue");
   const totalDuration = services.reduce((s, sv) => s + (sv.durationMin || 30), 0);
 
-  const newEntryRef = doc(queueRef);
+  // Count current waiting entries for position (no composite index needed)
+  const countSnap = await getCountFromServer(
+    query(queueRef, where("status", "==", "waiting"))
+  );
+  const position = countSnap.data().count + 1;
 
-  await runTransaction(db, async (transaction) => {
-    const waitingSnap = await getDocs(
-      query(queueRef, where("status", "==", "waiting"), orderBy("joinedAt"))
-    );
-    const position = waitingSnap.size + 1;
-
-    transaction.set(newEntryRef, {
-      customerId,
-      customerName,
-      services,
-      stylistId,
-      stylistName:      stylistName || null,
-      familyMembers,
-      checkingInSelf,
-      peopleCount,
-      status:           "waiting",
-      type:             "online",
-      position,
-      estimatedWaitMin: (position - 1) * totalDuration,
-      paymentStatus:    "pending",
-      joinedAt:         serverTimestamp(),
-      calledAt:         null,
-      completedAt:      null,
-    });
+  const newEntryRef = await addDoc(queueRef, {
+    customerId,
+    customerName,
+    services,
+    stylistId,
+    stylistName:      stylistName || null,
+    groupMembers,
+    isGroupBooking,
+    peopleCount,
+    status:           "waiting",
+    type:             "online",
+    totalPrice:       totalPrice ?? services.reduce((s, sv) => s + (sv.price || 0), 0) * peopleCount,
+    position,
+    estimatedWaitMin: (position - 1) * totalDuration,
+    paymentStatus:    "pending",
+    joinedAt:         serverTimestamp(),
+    calledAt:         null,
+    completedAt:      null,
   });
 
   return newEntryRef;

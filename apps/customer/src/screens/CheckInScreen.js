@@ -1,17 +1,21 @@
 // apps/customer/src/screens/CheckInScreen.js
+// Per-person services + stylist selection for group bookings
+
 import React, { useState, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, SafeAreaView, BackHandler, Platform,
+  ActivityIndicator, Alert, SafeAreaView, BackHandler,
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { joinQueue, getCustomer } from "../firebase";
 import { formatPrice, formatWait, calcEstimatedWait } from "../utils";
-import {
-  registerForPushNotifications,
-  savePushToken,
-} from "../services/notifications";
+
+// Turn "biplab.saha" or "biplab_saha" → "Biplab Saha"
+const formatEmailName = (email) =>
+  (email?.split("@")[0] || "Me")
+    .replace(/[._]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 
 const RELATIONSHIP_EMOJI = {
   Spouse: "💑", Child: "👶", Parent: "👨‍👩‍👦",
@@ -19,112 +23,291 @@ const RELATIONSHIP_EMOJI = {
   Friend: "👥", Other: "👤",
 };
 
+// ── Per-person card component ─────────────────────────────────────────────────
+function PersonCard({ person, salon, onUpdate }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const toggleService = (service) => {
+    const current = person.services || [];
+    const updated  = current.find((s) => s.id === service.id)
+      ? current.filter((s) => s.id !== service.id)
+      : [...current, service];
+    onUpdate({ ...person, services: updated });
+  };
+
+  const selectStylist = (stylist) => {
+    onUpdate({ ...person, stylistId: stylist?.id || null, stylistName: stylist?.name || null });
+    setExpanded(false);
+  };
+
+  const personServices  = person.services  || [];
+  const personTotal     = personServices.reduce((s, sv) => s + (sv.price || 0), 0);
+  const personDuration  = personServices.reduce((s, sv) => s + (sv.durationMin || 0), 0);
+  const hasServices     = personServices.length > 0;
+
+  return (
+    <View style={pc.card}>
+      {/* Person header */}
+      <TouchableOpacity style={pc.header} onPress={() => setExpanded(!expanded)}>
+        <View style={pc.avatar}>
+          <Text style={{ fontSize: 24 }}>
+            {person.isSelf ? "😊" : (RELATIONSHIP_EMOJI[person.relationship] || "👤")}
+          </Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={pc.name}>{person.name}</Text>
+          {hasServices ? (
+            <Text style={pc.servicesSummary} numberOfLines={1}>
+              {personServices.map((s) => s.name).join(", ")} · {formatPrice(personTotal)}
+            </Text>
+          ) : (
+            <Text style={pc.noServices}>Tap to select services</Text>
+          )}
+          {person.stylistName && (
+            <Text style={pc.stylistTag}>💇 {person.stylistName}</Text>
+          )}
+        </View>
+        <View style={[pc.statusDot, { backgroundColor: hasServices ? "#16a34a" : "#e5e7eb" }]} />
+        <Text style={pc.chevron}>{expanded ? "▲" : "▼"}</Text>
+      </TouchableOpacity>
+
+      {/* Expanded services + stylist picker */}
+      {expanded && (
+        <View style={pc.expanded}>
+          {/* Services */}
+          <Text style={pc.sectionLabel}>Services</Text>
+          {(salon.services || []).map((service) => {
+            const selected = !!personServices.find((s) => s.id === service.id);
+            return (
+              <TouchableOpacity
+                key={service.id}
+                style={[pc.serviceRow, selected && pc.serviceRowSel]}
+                onPress={() => toggleService(service)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[pc.serviceName, selected && { color: "#fff" }]}>{service.name}</Text>
+                  <Text style={[pc.serviceMeta, selected && { color: "#e5e7eb" }]}>{service.durationMin} min</Text>
+                </View>
+                <Text style={[pc.servicePrice, selected && { color: "#fff" }]}>{formatPrice(service.price)}</Text>
+                <View style={[pc.check, selected && pc.checkSel]}>
+                  {selected && <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>✓</Text>}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          {/* Stylist */}
+          {hasServices && <>
+            <Text style={[pc.sectionLabel, { marginTop: 16 }]}>Stylist (optional)</Text>
+            <TouchableOpacity
+              style={[pc.stylistRow, !person.stylistId && pc.stylistRowSel]}
+              onPress={() => selectStylist(null)}
+            >
+              <Text style={{ fontSize: 22 }}>🎲</Text>
+              <Text style={[pc.stylistName, !person.stylistId && { color: "#fff" }]}>Any available</Text>
+            </TouchableOpacity>
+            {(salon.stylists || []).filter((st) => st.status !== "off").map((stylist) => (
+              <TouchableOpacity
+                key={stylist.id}
+                style={[pc.stylistRow, person.stylistId === stylist.id && pc.stylistRowSel]}
+                onPress={() => selectStylist(stylist)}
+              >
+                <Text style={{ fontSize: 22 }}>💇</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[pc.stylistName, person.stylistId === stylist.id && { color: "#fff" }]}>
+                    {stylist.name}
+                  </Text>
+                  <Text style={[pc.stylistStatus, person.stylistId === stylist.id && { color: "#e5e7eb" }]}>
+                    {stylist.status === "available" ? "✅ Available" : "⏳ Busy"}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </>}
+
+          {/* Person subtotal */}
+          {hasServices && (
+            <View style={pc.subtotal}>
+              <Text style={pc.subtotalLabel}>{person.name}'s total</Text>
+              <Text style={pc.subtotalValue}>{formatPrice(personTotal)} · {personDuration} min</Text>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const pc = StyleSheet.create({
+  card:           { backgroundColor: "#fff", borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: "#e5e7eb", overflow: "hidden" },
+  header:         { flexDirection: "row", alignItems: "center", padding: 16, gap: 12 },
+  avatar:         { width: 46, height: 46, borderRadius: 14, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" },
+  name:           { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
+  servicesSummary:{ fontSize: 12, color: "#6b7280", marginTop: 2 },
+  noServices:     { fontSize: 12, color: "#9ca3af", marginTop: 2 },
+  stylistTag:     { fontSize: 11, color: "#16a34a", marginTop: 2, fontWeight: "600" },
+  statusDot:      { width: 10, height: 10, borderRadius: 5 },
+  chevron:        { fontSize: 12, color: "#9ca3af", marginLeft: 4 },
+  expanded:       { paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: "#f3f4f6" },
+  sectionLabel:   { fontSize: 12, fontWeight: "700", color: "#6b7280", marginTop: 12, marginBottom: 8 },
+  serviceRow:     { flexDirection: "row", alignItems: "center", backgroundColor: "#f9fafb", borderRadius: 12, padding: 12, marginBottom: 6, borderWidth: 1.5, borderColor: "#e5e7eb", gap: 10 },
+  serviceRowSel:  { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
+  serviceName:    { fontSize: 14, fontWeight: "600", color: "#1a1a2e" },
+  serviceMeta:    { fontSize: 11, color: "#6b7280", marginTop: 1 },
+  servicePrice:   { fontSize: 14, fontWeight: "700", color: "#1a1a2e" },
+  check:          { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: "#d1d5db", alignItems: "center", justifyContent: "center" },
+  checkSel:       { backgroundColor: "#16a34a", borderColor: "#16a34a" },
+  stylistRow:     { flexDirection: "row", alignItems: "center", backgroundColor: "#f9fafb", borderRadius: 12, padding: 12, marginBottom: 6, borderWidth: 1.5, borderColor: "#e5e7eb", gap: 10 },
+  stylistRowSel:  { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
+  stylistName:    { fontSize: 14, fontWeight: "600", color: "#1a1a2e" },
+  stylistStatus:  { fontSize: 11, color: "#6b7280", marginTop: 1 },
+  subtotal:       { flexDirection: "row", justifyContent: "space-between", backgroundColor: "#f0fdf4", borderRadius: 10, padding: 10, marginTop: 12 },
+  subtotalLabel:  { fontSize: 13, color: "#16a34a", fontWeight: "600" },
+  subtotalValue:  { fontSize: 13, color: "#16a34a", fontWeight: "700" },
+});
+
+// ── Main CheckIn Screen ───────────────────────────────────────────────────────
 export default function CheckInScreen({ route, navigation }) {
   const { salon } = route.params;
-  const [selectedServices,  setSelectedServices]  = useState([]);
-  const [selectedStylist,   setSelectedStylist]   = useState(null);
-  const [selectedMembers,   setSelectedMembers]   = useState([]); // family members to check in
-  const [checkingInSelf,    setCheckingInSelf]    = useState(true);
-  const [familyMembers,     setFamilyMembers]     = useState([]);
-  const [loading,           setLoading]           = useState(false);
-  const [step,              setStep]              = useState(1); // 1=who, 2=services, 3=stylist, 4=confirm
+  const [step,           setStep]           = useState(1);
+  const [persons,        setPersons]        = useState([]);
+  const [selfSelected,   setSelfSelected]   = useState(true);
+  const [familyMembers,  setFamilyMembers]  = useState([]);
+  const [selectedFamily, setSelectedFamily] = useState([]);
+  const [loading,        setLoading]        = useState(false);
 
   const user = getAuth().currentUser;
 
-  // Load family members
   useEffect(() => {
     if (user) {
-      getCustomer(user.uid).then((c) => {
-        setFamilyMembers(c?.familyMembers || []);
-      });
+      getCustomer(user.uid).then((c) => setFamilyMembers(c?.familyMembers || []));
     }
   }, []);
 
-  // Android back button — confirm before cancelling
+  // Handle Android back
   useEffect(() => {
-    if (Platform.OS !== "android") return;
-    const onBack = () => {
-      const hasSelections = selectedServices.length > 0 || selectedMembers.length > 0;
-      if (step === 1 && hasSelections) {
-        Alert.alert(
-          "Cancel check-in?",
-          "You have unsaved selections. Are you sure you want to go back?",
-          [
-            { text: "Stay", style: "cancel" },
-            { text: "Leave", style: "destructive", onPress: () => navigation.goBack() },
-          ]
-        );
-        return true; // prevent default back
-      }
-      if (step > 1) {
-        setStep(step - 1);
-        return true;
-      }
-      return false;
-    };
-    const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
-    return () => sub.remove();
-  }, [step, selectedServices, selectedMembers]);
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
+      handleBack(); return true;
+    });
+    return () => backHandler.remove();
+  }, [step, persons]);
 
-  const toggleService = (service) =>
-    setSelectedServices((prev) =>
-      prev.find((s) => s.id === service.id)
-        ? prev.filter((s) => s.id !== service.id)
-        : [...prev, service]
-    );
-
-  const toggleMember = (member) => {
-    setSelectedMembers((prev) =>
-      prev.find((m) => m.id === member.id)
-        ? prev.filter((m) => m.id !== member.id)
-        : [...prev, member]
-    );
+  const handleBack = () => {
+    if (step > 1) { setStep(step - 1); return; }
+    const hasSelections = persons.some((p) => (p.services || []).length > 0);
+    if (hasSelections) {
+      Alert.alert(
+        "Cancel check-in?",
+        "You'll lose your current selections.",
+        [
+          { text: "Keep going", style: "cancel" },
+          { text: "Yes, cancel", style: "destructive", onPress: () => navigation.goBack() },
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
   };
 
-  // Who is checking in
-  const checkInNames = [
-    ...(checkingInSelf ? ["Myself"] : []),
-    ...selectedMembers.map((m) => m.name),
-  ];
+  const buildPersons = (self, family) => {
+    const list = [];
+    if (self) {
+      list.push({
+        id:          user?.uid || "self",
+        name:        user?.displayName || formatEmailName(user?.email),
+        isSelf:      true,
+        services:    [],
+        stylistId:   null,
+        stylistName: null,
+      });
+    }
+    family.forEach((m) => {
+      list.push({
+        id:           m.id,
+        name:         m.name,
+        relationship: m.relationship,
+        isSelf:       false,
+        services:     [],
+        stylistId:    null,
+        stylistName:  null,
+      });
+    });
+    return list;
+  };
 
-  const totalPrice    = selectedServices.reduce((s, sv) => s + sv.price, 0);
-  const totalDuration = selectedServices.reduce((s, sv) => s + sv.durationMin, 0);
-  const activeStylists = (salon.stylists || []).filter((s) => s.status === "available").length || 1;
-  const estimatedWait  = calcEstimatedWait((salon.queueCount || 0) + 1, selectedServices, activeStylists);
+  const toggleSelf = () => {
+    const newSelf = !selfSelected;
+    setSelfSelected(newSelf);
+    setPersons(buildPersons(newSelf, selectedFamily));
+  };
 
-  // Number of people checking in
-  const peopleCount = (checkingInSelf ? 1 : 0) + selectedMembers.length;
+  const toggleFamilyMember = (member) => {
+    const newFamily = selectedFamily.find((m) => m.id === member.id)
+      ? selectedFamily.filter((m) => m.id !== member.id)
+      : [...selectedFamily, member];
+    setSelectedFamily(newFamily);
+    setPersons(buildPersons(selfSelected, newFamily));
+  };
+
+  const updatePerson = (updatedPerson) => {
+    setPersons((prev) => prev.map((p) => p.id === updatedPerson.id ? updatedPerson : p));
+  };
+
+  // Totals
+  const totalPrice    = persons.reduce((sum, p) => sum + (p.services || []).reduce((s, sv) => s + (sv.price || 0), 0), 0);
+  const totalDuration = persons.reduce((sum, p) => sum + (p.services || []).reduce((s, sv) => s + (sv.durationMin || 0), 0), 0);
+  const peopleCount   = persons.length;
+  const allHaveServices = persons.length > 0 && persons.every((p) => (p.services || []).length > 0);
+  const activeStylists  = (salon.stylists || []).filter((s) => s.status === "available").length || 1;
+  const estimatedWait   = calcEstimatedWait((salon.queueCount || 0) + 1, persons[0]?.services || [], activeStylists);
+
+  const hasWhoStep   = familyMembers.length > 0;
+  const totalSteps   = hasWhoStep ? 3 : 2;
+  const servicesStep = hasWhoStep ? 2 : 1;
+  const confirmStep  = hasWhoStep ? 3 : 2;
+
+  // Initialize persons on first render if no family members
+  useEffect(() => {
+    if (familyMembers.length === 0) {
+      setPersons(buildPersons(true, []));
+    }
+  }, [familyMembers]);
 
   const handleCheckIn = async () => {
-    if (peopleCount === 0) { Alert.alert("Select who is checking in"); return; }
-    if (!selectedServices.length) { Alert.alert("Select a service"); return; }
-
+    if (!allHaveServices) {
+      Alert.alert("Missing services", "Please select at least one service for each person.");
+      return;
+    }
     setLoading(true);
     try {
-      const pushToken = await registerForPushNotifications();
+      const groupMembers = persons.map((p) => ({
+        id:           p.id,
+        name:         p.name,
+        isSelf:       p.isSelf,
+        relationship: p.relationship || null,
+        services:     p.services,
+        stylistId:    p.stylistId   || null,
+        stylistName:  p.stylistName || null,
+      }));
 
-      // Build customer name string
-      const customerName = checkInNames.join(", ");
+      const customerName = persons.map((p) => p.name).join(", ");
 
       const entryRef = await joinQueue({
-        salonId:       salon.id,
-        customerId:    user?.uid ?? null,
+        salonId:        salon.id,
+        customerId:     user?.uid ?? null,
         customerName,
-        services:      selectedServices,
-        stylistId:     selectedStylist?.id ?? null,
-        familyMembers: selectedMembers,
-        checkingInSelf,
-        peopleCount,
+        services:       persons[0]?.services || [],
+        stylistId:      persons[0]?.stylistId   || null,
+        stylistName:    persons[0]?.stylistName || null,
+        groupMembers,
+        isGroupBooking: persons.length > 1,
+        peopleCount:    persons.length,
+        totalPrice,
       });
 
-      if (pushToken) await savePushToken(salon.id, entryRef.id, pushToken);
-
-      const activeQueue = {
-        salonId:   salon.id,
-        entryId:   entryRef.id,
-        salonName: salon.name,
-      };
-      await AsyncStorage.setItem("activeQueue", JSON.stringify(activeQueue));
+      await AsyncStorage.setItem("activeQueue", JSON.stringify({
+        salonId: salon.id, entryId: entryRef.id, salonName: salon.name,
+      }));
 
       navigation.reset({
         index: 0,
@@ -147,22 +330,13 @@ export default function CheckInScreen({ route, navigation }) {
     }
   };
 
-  const steps = familyMembers.length > 0
-    ? ["Who", "Services", "Stylist", "Confirm"]
-    : ["Services", "Stylist", "Confirm"];
-  const totalSteps = steps.length;
-
-  // Adjust step numbering based on whether "Who" step exists
-  const hasWhoStep = familyMembers.length > 0;
-  const serviceStep  = hasWhoStep ? 2 : 1;
-  const stylistStep  = hasWhoStep ? 3 : 2;
-  const confirmStep  = hasWhoStep ? 4 : 3;
+  const STEPS = hasWhoStep ? ["Who", "Services", "Confirm"] : ["Services", "Confirm"];
 
   return (
     <SafeAreaView style={s.container}>
       {/* Top bar */}
       <View style={s.topBar}>
-        <TouchableOpacity onPress={() => step > 1 ? setStep(step - 1) : navigation.goBack()}>
+        <TouchableOpacity onPress={handleBack}>
           <Text style={s.back}>{step > 1 ? "← Back" : "← Cancel"}</Text>
         </TouchableOpacity>
         <Text style={s.topTitle}>{salon.name}</Text>
@@ -171,67 +345,46 @@ export default function CheckInScreen({ route, navigation }) {
 
       {/* Step indicator */}
       <View style={s.steps}>
-        {steps.map((label, i) => (
+        {STEPS.map((label, i) => (
           <View key={label} style={s.stepItem}>
-            <View style={[
-              s.stepCircle,
-              step > i + 1 && s.stepDone,
-              step === i + 1 && s.stepActive,
-            ]}>
-              <Text style={[s.stepNum, (step > i + 1 || step === i + 1) && { color: "#fff" }]}>
-                {i + 1}
-              </Text>
+            <View style={[s.stepCircle, step > i + 1 && s.stepDone, step === i + 1 && s.stepActive]}>
+              <Text style={[s.stepNum, (step > i + 1 || step === i + 1) && { color: "#fff" }]}>{i + 1}</Text>
             </View>
-            <Text style={[s.stepLabel, step === i + 1 && { color: "#1a1a2e", fontWeight: "600" }]}>
-              {label}
-            </Text>
+            <Text style={[s.stepLabel, step === i + 1 && { color: "#1a1a2e", fontWeight: "600" }]}>{label}</Text>
           </View>
         ))}
       </View>
 
       <ScrollView contentContainerStyle={s.content}>
 
-        {/* ── Step 1: Who is checking in? (only if family members exist) ── */}
+        {/* ── Step 1: Who ── */}
         {step === 1 && hasWhoStep && <>
           <Text style={s.sectionTitle}>Who is checking in?</Text>
-          <Text style={s.sectionSub}>Select everyone who needs a service today</Text>
+          <Text style={s.sectionSub}>Select everyone joining today</Text>
 
-          {/* Myself */}
-          <TouchableOpacity
-            style={[s.whoCard, checkingInSelf && s.whoCardSel]}
-            onPress={() => setCheckingInSelf(!checkingInSelf)}
-          >
-            <View style={s.whoAvatar}>
-              <Text style={{ fontSize: 26 }}>😊</Text>
-            </View>
+          <TouchableOpacity style={[s.whoCard, selfSelected && s.whoCardSel]} onPress={toggleSelf}>
+            <View style={s.whoAvatar}><Text style={{ fontSize: 26 }}>😊</Text></View>
             <View style={{ flex: 1 }}>
-              <Text style={[s.whoName, checkingInSelf && { color: "#fff" }]}>Myself</Text>
-              <Text style={[s.whoRel, checkingInSelf && { color: "#e5e7eb" }]}>
-                {user?.displayName || user?.email || "You"}
+              <Text style={[s.whoName, selfSelected && { color: "#fff" }]}>
+                {user?.displayName || formatEmailName(user?.email)}
               </Text>
+              <Text style={[s.whoSub, selfSelected && { color: "#e5e7eb" }]}>Myself</Text>
             </View>
-            <View style={[s.checkCircle, checkingInSelf && s.checkCircleSel]}>
-              {checkingInSelf && <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>✓</Text>}
+            <View style={[s.checkCircle, selfSelected && s.checkCircleSel]}>
+              {selfSelected && <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>✓</Text>}
             </View>
           </TouchableOpacity>
 
-          {/* Family members */}
           {familyMembers.map((member) => {
-            const selected = !!selectedMembers.find((m) => m.id === member.id);
+            const selected = !!selectedFamily.find((m) => m.id === member.id);
             return (
-              <TouchableOpacity
-                key={member.id}
-                style={[s.whoCard, selected && s.whoCardSel]}
-                onPress={() => toggleMember(member)}
-              >
+              <TouchableOpacity key={member.id} style={[s.whoCard, selected && s.whoCardSel]} onPress={() => toggleFamilyMember(member)}>
                 <View style={s.whoAvatar}>
-                  <Text style={{ fontSize: 26 }}>
-                    {RELATIONSHIP_EMOJI[member.relationship] || "👤"}
-                  </Text>
+                  <Text style={{ fontSize: 26 }}>{RELATIONSHIP_EMOJI[member.relationship] || "👤"}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[s.whoName, selected && { color: "#fff" }]}>{member.name}</Text>
-                  <Text style={[s.whoRel, selected && { color: "#e5e7eb" }]}>{member.relationship}</Text>
+                  <Text style={[s.whoSub, selected && { color: "#e5e7eb" }]}>{member.relationship}</Text>
                 </View>
                 <View style={[s.checkCircle, selected && s.checkCircleSel]}>
                   {selected && <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>✓</Text>}
@@ -240,132 +393,126 @@ export default function CheckInScreen({ route, navigation }) {
             );
           })}
 
-          {peopleCount > 0 && (
+          {persons.length > 0 && (
             <View style={s.selectionNote}>
               <Text style={s.selectionNoteText}>
-                ✅ {peopleCount} person{peopleCount > 1 ? "s" : ""} selected: {checkInNames.join(", ")}
+                ✅ {persons.length} person{persons.length > 1 ? "s" : ""} selected: {persons.map((p) => p.name).join(", ")}
               </Text>
             </View>
           )}
         </>}
 
-        {/* ── Services step ── */}
-        {step === serviceStep && <>
-          <Text style={s.sectionTitle}>Choose services</Text>
-          {peopleCount > 1 && (
-            <View style={s.groupNote}>
-              <Text style={s.groupNoteText}>
-                👨‍👩‍👧 Checking in {peopleCount} people — select services for the group
-              </Text>
-            </View>
-          )}
-          {(salon.services || []).map((service) => {
-            const selected = !!selectedServices.find((sv) => sv.id === service.id);
-            return (
-              <TouchableOpacity
-                key={service.id}
-                style={[s.serviceCard, selected && s.serviceCardSel]}
-                onPress={() => toggleService(service)}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.serviceName, selected && { color: "#fff" }]}>{service.name}</Text>
-                  <Text style={[s.serviceMeta, selected && { color: "#e5e7eb" }]}>{service.durationMin} min</Text>
-                </View>
-                <View style={s.serviceRight}>
-                  <Text style={[s.servicePrice, selected && { color: "#fff" }]}>{formatPrice(service.price)}</Text>
-                  <View style={[s.checkCircle, selected && s.checkCircleSel]}>
-                    {selected && <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>✓</Text>}
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </>}
+        {/* ── Step 2: Services per person ── */}
+        {step === servicesStep && <>
+          <Text style={s.sectionTitle}>
+            {persons.length > 1 ? "Services for each person" : "Choose services"}
+          </Text>
+          <Text style={s.sectionSub}>
+            {persons.length > 1
+              ? "Tap each person to pick their services and stylist"
+              : "Select your services and preferred stylist"
+            }
+          </Text>
 
-        {/* ── Stylist step ── */}
-        {step === stylistStep && <>
-          <Text style={s.sectionTitle}>Choose a stylist</Text>
-          <Text style={s.sectionSub}>Optional — leave blank for next available</Text>
-          <TouchableOpacity
-            style={[s.stylistCard, !selectedStylist && s.stylistCardSel]}
-            onPress={() => setSelectedStylist(null)}
-          >
-            <Text style={{ fontSize: 28 }}>🎲</Text>
-            <Text style={[s.stylistName, !selectedStylist && { color: "#fff" }]}>Any available stylist</Text>
-          </TouchableOpacity>
-          {(salon.stylists || []).filter((st) => st.status !== "off").map((stylist) => (
-            <TouchableOpacity
-              key={stylist.id}
-              style={[s.stylistCard, selectedStylist?.id === stylist.id && s.stylistCardSel]}
-              onPress={() => setSelectedStylist(stylist)}
-            >
-              <Text style={{ fontSize: 28 }}>💇</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.stylistName, selectedStylist?.id === stylist.id && { color: "#fff" }]}>
-                  {stylist.name}
-                </Text>
-                <Text style={[s.stylistStatus, selectedStylist?.id === stylist.id && { color: "#e5e7eb" }]}>
-                  {stylist.status === "available" ? "✅ Available" : "⏳ Busy"}
-                </Text>
-              </View>
-            </TouchableOpacity>
+          {persons.map((person) => (
+            <PersonCard key={person.id} person={person} salon={salon} onUpdate={updatePerson} />
           ))}
+
+          <View style={s.progressCard}>
+            {persons.map((p) => {
+              const done = (p.services || []).length > 0;
+              return (
+                <View key={p.id} style={s.progressRow}>
+                  <Text style={[s.progressDot, { color: done ? "#16a34a" : "#e5e7eb" }]}>●</Text>
+                  <Text style={[s.progressName, done && { color: "#16a34a" }]}>{p.name}</Text>
+                  <Text style={s.progressServices}>
+                    {done ? (p.services || []).map((sv) => sv.name).join(", ") : "No services selected"}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
         </>}
 
-        {/* ── Confirm step ── */}
+        {/* ── Step 3: Confirm ── */}
         {step === confirmStep && <>
-          <Text style={s.sectionTitle}>Confirm check-in</Text>
+          <Text style={s.sectionTitle}>Confirm booking</Text>
           <View style={s.confirmCard}>
-            {[
-              ["Salon",       salon.name],
-              ["Checking in", checkInNames.join(", ")],
-              ["Services",    selectedServices.map((sv) => sv.name).join(", ")],
-              ["Stylist",     selectedStylist?.name || "Any available"],
-              ["Duration",    `~${totalDuration} min`],
-              ["Est. wait",   formatWait(estimatedWait), "#d97706"],
-            ].map(([label, value, color]) => (
-              <View key={label} style={s.confirmRow}>
-                <Text style={s.confirmLabel}>{label}</Text>
-                <Text style={[s.confirmValue, color && { color, fontWeight: "700" }]}>{value}</Text>
+            <View style={s.confirmRow}>
+              <Text style={s.confirmLabel}>Salon</Text>
+              <Text style={s.confirmValue}>{salon.name}</Text>
+            </View>
+            <View style={s.divider} />
+
+            {persons.map((person, i) => (
+              <View key={person.id}>
+                <View style={s.personConfirmHeader}>
+                  <Text style={{ fontSize: 16 }}>
+                    {person.isSelf ? "😊" : (RELATIONSHIP_EMOJI[person.relationship] || "👤")}
+                  </Text>
+                  <Text style={s.personConfirmName}>{person.name}</Text>
+                  <Text style={s.personConfirmTotal}>
+                    {formatPrice((person.services || []).reduce((s, sv) => s + (sv.price || 0), 0))}
+                  </Text>
+                </View>
+                <Text style={s.personConfirmServices}>
+                  {(person.services || []).map((sv) => sv.name).join(", ")}
+                </Text>
+                <Text style={s.personConfirmStylist}>
+                  💇 {person.stylistName || "Any available stylist"}
+                </Text>
+                {i < persons.length - 1 && <View style={s.divider} />}
               </View>
             ))}
+
             <View style={s.divider} />
             <View style={s.confirmRow}>
-              <Text style={s.confirmLabel}>Total</Text>
-              <Text style={[s.confirmValue, { fontWeight: "800", fontSize: 16 }]}>{formatPrice(totalPrice)}</Text>
+              <Text style={s.confirmLabel}>Est. wait</Text>
+              <Text style={[s.confirmValue, { color: "#d97706", fontWeight: "700" }]}>
+                {formatWait(estimatedWait)}
+              </Text>
+            </View>
+            <View style={s.confirmRow}>
+              <Text style={s.confirmLabel}>Duration</Text>
+              <Text style={s.confirmValue}>~{totalDuration} min</Text>
+            </View>
+            <View style={s.divider} />
+            <View style={s.confirmRow}>
+              <Text style={[s.confirmLabel, { fontSize: 16, fontWeight: "800", color: "#1a1a2e" }]}>Total</Text>
+              <Text style={[s.confirmValue, { fontSize: 18, fontWeight: "900", color: "#1a1a2e" }]}>
+                {formatPrice(totalPrice)}
+              </Text>
             </View>
           </View>
+
           <View style={s.notifNote}>
             <Text style={s.notifNoteText}>
-              🔔 You'll receive push notifications when your turn is coming up.
+              🔔 You'll receive a push notification when your group is being called.
             </Text>
           </View>
         </>}
-
       </ScrollView>
 
       {/* Footer */}
       <View style={s.footer}>
-        {selectedServices.length > 0 && (
+        {step === servicesStep && totalPrice > 0 && (
           <Text style={s.footerMeta}>
             {peopleCount > 1 ? `${peopleCount} people · ` : ""}
-            {selectedServices.length} service(s) · {formatPrice(totalPrice)} · {totalDuration} min
+            {formatPrice(totalPrice)} · {totalDuration} min
           </Text>
         )}
         <TouchableOpacity
           style={[
             s.nextBtn,
-            ((step === 1 && hasWhoStep && peopleCount === 0) ||
-             (step === serviceStep && !selectedServices.length)) && { opacity: 0.4 },
+            ((step === 1 && hasWhoStep && persons.length === 0) ||
+             (step === servicesStep && !allHaveServices)) && { opacity: 0.4 },
           ]}
           onPress={() => {
-            if (step === 1 && hasWhoStep && peopleCount === 0) {
-              Alert.alert("Select who is checking in");
-              return;
+            if (step === 1 && hasWhoStep && persons.length === 0) {
+              Alert.alert("Select who is checking in"); return;
             }
-            if (step === serviceStep && !selectedServices.length) {
-              Alert.alert("Select a service");
-              return;
+            if (step === servicesStep && !allHaveServices) {
+              Alert.alert("Missing services", "Please select at least one service for each person."); return;
             }
             if (step < totalSteps) setStep(step + 1);
             else handleCheckIn();
@@ -383,60 +530,48 @@ export default function CheckInScreen({ route, navigation }) {
 }
 
 const s = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: "#fafafa" },
-  topBar:         { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
-  back:           { fontSize: 15, color: "#1a1a2e", fontWeight: "600", width: 70 },
-  topTitle:       { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
-  steps:          { flexDirection: "row", justifyContent: "center", gap: 20, paddingVertical: 14, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
-  stepItem:       { alignItems: "center", gap: 4 },
-  stepCircle:     { width: 28, height: 28, borderRadius: 14, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#e5e7eb" },
-  stepActive:     { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
-  stepDone:       { backgroundColor: "#16a34a", borderColor: "#16a34a" },
-  stepNum:        { fontSize: 12, fontWeight: "700", color: "#9ca3af" },
-  stepLabel:      { fontSize: 10, color: "#9ca3af" },
-  content:        { padding: 20, paddingBottom: 140 },
-  sectionTitle:   { fontSize: 20, fontWeight: "800", color: "#1a1a2e", marginBottom: 6 },
-  sectionSub:     { fontSize: 13, color: "#6b7280", marginBottom: 16 },
-
-  // Who step
-  whoCard:        { backgroundColor: "#fff", borderRadius: 14, padding: 16, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1.5, borderColor: "#e5e7eb" },
-  whoCardSel:     { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
-  whoAvatar:      { width: 46, height: 46, borderRadius: 14, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" },
-  whoName:        { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
-  whoRel:         { fontSize: 12, color: "#6b7280", marginTop: 2 },
-  checkCircle:    { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: "#d1d5db", alignItems: "center", justifyContent: "center" },
-  checkCircleSel: { backgroundColor: "#16a34a", borderColor: "#16a34a" },
-  selectionNote:  { backgroundColor: "#dcfce7", borderRadius: 12, padding: 12, marginTop: 8 },
-  selectionNoteText: { fontSize: 13, color: "#16a34a", fontWeight: "600" },
-  groupNote:      { backgroundColor: "#eff6ff", borderRadius: 12, padding: 12, marginBottom: 16 },
-  groupNoteText:  { fontSize: 13, color: "#1d4ed8" },
-
-  // Services
-  serviceCard:    { backgroundColor: "#fff", borderRadius: 14, padding: 16, marginBottom: 10, flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderColor: "#e5e7eb" },
-  serviceCardSel: { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
-  serviceName:    { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
-  serviceMeta:    { fontSize: 12, color: "#6b7280", marginTop: 2 },
-  serviceRight:   { alignItems: "flex-end", gap: 6 },
-  servicePrice:   { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
-
-  // Stylist
-  stylistCard:    { backgroundColor: "#fff", borderRadius: 14, padding: 16, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 14, borderWidth: 1.5, borderColor: "#e5e7eb" },
-  stylistCardSel: { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
-  stylistName:    { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
-  stylistStatus:  { fontSize: 12, color: "#6b7280", marginTop: 2 },
-
-  // Confirm
-  confirmCard:    { backgroundColor: "#fff", borderRadius: 16, padding: 18, borderWidth: 1, borderColor: "#e5e7eb" },
-  confirmRow:     { flexDirection: "row", justifyContent: "space-between", paddingVertical: 10 },
-  confirmLabel:   { fontSize: 14, color: "#6b7280" },
-  confirmValue:   { fontSize: 14, color: "#1a1a2e", fontWeight: "500", flex: 1, textAlign: "right" },
-  divider:        { height: 1, backgroundColor: "#f3f4f6", marginVertical: 4 },
-  notifNote:      { backgroundColor: "#eff6ff", borderRadius: 12, padding: 14, marginTop: 16 },
-  notifNoteText:  { fontSize: 13, color: "#1d4ed8", lineHeight: 18 },
-
-  // Footer
-  footer:         { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f3f4f6", padding: 16 },
-  footerMeta:     { textAlign: "center", color: "#6b7280", fontSize: 13, marginBottom: 8 },
-  nextBtn:        { backgroundColor: "#1a1a2e", borderRadius: 14, paddingVertical: 16, alignItems: "center" },
-  nextBtnText:    { color: "#fff", fontSize: 16, fontWeight: "800" },
+  container:           { flex: 1, backgroundColor: "#fafafa" },
+  topBar:              { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  back:                { fontSize: 15, color: "#1a1a2e", fontWeight: "600", width: 70 },
+  topTitle:            { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
+  steps:               { flexDirection: "row", justifyContent: "center", gap: 24, paddingVertical: 14, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  stepItem:            { alignItems: "center", gap: 4 },
+  stepCircle:          { width: 28, height: 28, borderRadius: 14, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#e5e7eb" },
+  stepActive:          { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
+  stepDone:            { backgroundColor: "#16a34a", borderColor: "#16a34a" },
+  stepNum:             { fontSize: 12, fontWeight: "700", color: "#9ca3af" },
+  stepLabel:           { fontSize: 10, color: "#9ca3af" },
+  content:             { padding: 16, paddingBottom: 120 },
+  sectionTitle:        { fontSize: 20, fontWeight: "800", color: "#1a1a2e", marginBottom: 4 },
+  sectionSub:          { fontSize: 13, color: "#6b7280", marginBottom: 16 },
+  whoCard:             { backgroundColor: "#fff", borderRadius: 14, padding: 16, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1.5, borderColor: "#e5e7eb" },
+  whoCardSel:          { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
+  whoAvatar:           { width: 46, height: 46, borderRadius: 14, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" },
+  whoName:             { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
+  whoSub:              { fontSize: 12, color: "#6b7280", marginTop: 2 },
+  checkCircle:         { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: "#d1d5db", alignItems: "center", justifyContent: "center" },
+  checkCircleSel:      { backgroundColor: "#16a34a", borderColor: "#16a34a" },
+  selectionNote:       { backgroundColor: "#dcfce7", borderRadius: 12, padding: 12, marginTop: 4 },
+  selectionNoteText:   { fontSize: 13, color: "#16a34a", fontWeight: "600" },
+  progressCard:        { backgroundColor: "#fff", borderRadius: 14, padding: 14, marginTop: 12, borderWidth: 1, borderColor: "#e5e7eb" },
+  progressRow:         { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4 },
+  progressDot:         { fontSize: 12 },
+  progressName:        { fontSize: 13, fontWeight: "700", color: "#6b7280", width: 70 },
+  progressServices:    { fontSize: 12, color: "#9ca3af", flex: 1 },
+  confirmCard:         { backgroundColor: "#fff", borderRadius: 16, padding: 18, borderWidth: 1, borderColor: "#e5e7eb" },
+  confirmRow:          { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8 },
+  confirmLabel:        { fontSize: 14, color: "#6b7280" },
+  confirmValue:        { fontSize: 14, color: "#1a1a2e", fontWeight: "500", flex: 1, textAlign: "right" },
+  personConfirmHeader: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
+  personConfirmName:   { flex: 1, fontSize: 14, fontWeight: "700", color: "#1a1a2e" },
+  personConfirmTotal:  { fontSize: 14, fontWeight: "700", color: "#1a1a2e" },
+  personConfirmServices:{ fontSize: 12, color: "#6b7280", paddingLeft: 28, marginBottom: 2 },
+  personConfirmStylist: { fontSize: 12, color: "#9ca3af", paddingLeft: 28, marginBottom: 8 },
+  divider:             { height: 1, backgroundColor: "#f3f4f6", marginVertical: 4 },
+  notifNote:           { backgroundColor: "#eff6ff", borderRadius: 12, padding: 14, marginTop: 12 },
+  notifNoteText:       { fontSize: 13, color: "#1d4ed8", lineHeight: 18 },
+  footer:              { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f3f4f6", padding: 16 },
+  footerMeta:          { textAlign: "center", color: "#6b7280", fontSize: 13, marginBottom: 8 },
+  nextBtn:             { backgroundColor: "#1a1a2e", borderRadius: 14, paddingVertical: 16, alignItems: "center" },
+  nextBtnText:         { color: "#fff", fontSize: 16, fontWeight: "800" },
 });

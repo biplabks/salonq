@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  SafeAreaView,
+  SafeAreaView, ScrollView,
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import { logout } from "../firebase";
@@ -50,6 +50,7 @@ export default function SalonSettingsScreen({ salon, salonId }) {
 
   return (
     <SafeAreaView style={s.container}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
       <Text style={s.title}>Settings</Text>
 
       {/* Salon info card */}
@@ -106,6 +107,7 @@ export default function SalonSettingsScreen({ salon, salonId }) {
       </TouchableOpacity>
 
       <Text style={s.version}>SalonQ Dashboard v1.0.0</Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -130,7 +132,8 @@ const MenuItem = ({ emoji, label, onPress, last }) => (
 );
 
 const s = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: "#fafafa", paddingHorizontal: 20 },
+  container:   { flex: 1, backgroundColor: "#fafafa" },
+  scroll:      { paddingHorizontal: 20, paddingBottom: 40 },
   title:       { fontSize: 26, fontWeight: "800", color: "#1a1a2e", marginTop: 20, marginBottom: 20 },
   card:        { backgroundColor: "#1a1a2e", borderRadius: 18, padding: 20, flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 16 },
   salonIcon:   { width: 52, height: 52, borderRadius: 14, backgroundColor: "#ffffff20", alignItems: "center", justifyContent: "center" },

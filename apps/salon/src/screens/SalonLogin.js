@@ -4,7 +4,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from "react-native";
-import { loginWithEmail, registerWithEmail } from "../firebase";
+import { loginWithEmail, registerOrLogin } from "../firebase";
 
 export default function SalonLogin() {
   const [mode,     setMode]     = useState("login"); // "login" | "register"
@@ -27,7 +27,7 @@ export default function SalonLogin() {
       if (mode === "login") {
         await loginWithEmail(email, password);
       } else {
-        await registerWithEmail(email, password);
+        await registerOrLogin(email, password);
       }
     } catch (err) {
       showError(mode === "login" ? "Login failed" : "Registration failed", err.message);
