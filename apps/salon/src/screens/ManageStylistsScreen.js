@@ -7,15 +7,10 @@ import {
 import { saveSalon } from "../firebase";
 import { crossAlert, crossAlertInfo } from "../utils/crossAlert";
 
-const AVAILABLE_SKILLS = [
-  "Haircut", "Haircut & Blow-dry", "Hair Colour",
-  "Beard Trim", "Head Massage", "Manicure",
-  "Pedicure", "Hair Treatment", "Styling",
-];
-
 const generateId = () => `st_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
 export default function ManageStylistsScreen({ salon, salonId, onBack }) {
+  const salonServices = salon?.services || [];
   const [stylists, setStylists]   = useState(salon?.stylists || []);
   const [showModal, setShowModal] = useState(false);
   const [editing,   setEditing]   = useState(null); // null = adding new
@@ -128,7 +123,10 @@ export default function ManageStylistsScreen({ salon, salonId, onBack }) {
               <View style={{ flex: 1 }}>
                 <Text style={s.stylistName}>{stylist.name}</Text>
                 <Text style={s.skills} numberOfLines={2}>
-                  {(stylist.skills || []).join(" · ")}
+                  {(stylist.skills || [])
+                    .map((id) => salonServices.find((sv) => sv.id === id)?.name)
+                    .filter(Boolean)
+                    .join(" · ") || "No services assigned"}
                 </Text>
               </View>
             </View>
@@ -164,23 +162,29 @@ export default function ManageStylistsScreen({ salon, salonId, onBack }) {
               autoCapitalize="words"
             />
 
-            <Text style={m.label}>Skills * (select all that apply)</Text>
-            <View style={m.skillsGrid}>
-              {AVAILABLE_SKILLS.map((skill) => {
-                const selected = skills.includes(skill);
-                return (
-                  <TouchableOpacity
-                    key={skill}
-                    style={[m.skillBtn, selected && m.skillBtnSel]}
-                    onPress={() => toggleSkill(skill)}
-                  >
-                    <Text style={[m.skillText, selected && m.skillTextSel]}>
-                      {selected ? "✓ " : ""}{skill}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <Text style={m.label}>Services * (select all this stylist can do)</Text>
+            {salonServices.length === 0 ? (
+              <Text style={m.noServices}>
+                No services found. Add services in Salon Settings first.
+              </Text>
+            ) : (
+              <View style={m.skillsGrid}>
+                {salonServices.map((service) => {
+                  const selected = skills.includes(service.id);
+                  return (
+                    <TouchableOpacity
+                      key={service.id}
+                      style={[m.skillBtn, selected && m.skillBtnSel]}
+                      onPress={() => toggleSkill(service.id)}
+                    >
+                      <Text style={[m.skillText, selected && m.skillTextSel]}>
+                        {selected ? "✓ " : ""}{service.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
             <TouchableOpacity style={m.saveBtn} onPress={handleSave} disabled={loading}>
               {loading
@@ -234,6 +238,7 @@ const m = StyleSheet.create({
   skillBtnSel:  { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
   skillText:    { fontSize: 13, color: "#6b7280", fontWeight: "500" },
   skillTextSel: { color: "#fff", fontWeight: "600" },
+  noServices:   { fontSize: 13, color: "#9ca3af", fontStyle: "italic", marginTop: 4 },
   saveBtn:      { backgroundColor: "#1a1a2e", borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 28 },
   saveBtnText:  { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

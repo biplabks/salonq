@@ -12,6 +12,7 @@ const STATUS_CONFIG = {
 
 export default function StylistBoard({ salon, salonId }) {
   const [stylists, setStylists] = useState(salon?.stylists || []);
+  const salonServices = salon?.services || [];
 
   const updateStatus = async (id, status) => {
     const updated = stylists.map((s) => s.id === id ? { ...s, status } : s);
@@ -37,7 +38,11 @@ export default function StylistBoard({ salon, salonId }) {
                 <View style={[s.avatar, { backgroundColor: cfg.bg }]}><Text style={{ fontSize: 24 }}>💇</Text></View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.name}>{st.name}</Text>
-                  <Text style={s.skills}>{(st.skills || []).join(" · ")}</Text>
+                  <Text style={s.skills}>
+                    {(st.skills || [])
+                      .map((id) => salonServices.find((sv) => sv.id === id)?.name || id)
+                      .join(" · ")}
+                  </Text>
                 </View>
                 <View style={[s.statusBadge, { backgroundColor: cfg.bg }]}>
                   <Text style={[s.statusText, { color: cfg.color }]}>{cfg.label}</Text>

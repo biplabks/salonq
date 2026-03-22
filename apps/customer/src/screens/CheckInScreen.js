@@ -97,33 +97,49 @@ function PersonCard({ person, salon, onUpdate }) {
           })}
 
           {/* Stylist */}
-          {hasServices && <>
-            <Text style={[pc.sectionLabel, { marginTop: 16 }]}>Stylist (optional)</Text>
-            <TouchableOpacity
-              style={[pc.stylistRow, !person.stylistId && pc.stylistRowSel]}
-              onPress={() => selectStylist(null)}
-            >
-              <Text style={{ fontSize: 22 }}>🎲</Text>
-              <Text style={[pc.stylistName, !person.stylistId && { color: "#fff" }]}>Any available</Text>
-            </TouchableOpacity>
-            {(salon.stylists || []).filter((st) => st.status !== "off").map((stylist) => (
+          {hasServices && (()=> {
+            const selectedServiceIds = personServices.map((sv) => sv.id);
+            const eligibleStylists = (salon.stylists || []).filter((stylist) => {
+              if (!stylist.skills || stylist.skills.length === 0) return true;
+              return selectedServiceIds.every((id) => stylist.skills.includes(id));
+            }).filter((st) => st.status !== "off");
+
+            return <>
+              <Text style={[pc.sectionLabel, { marginTop: 16 }]}>Stylist (optional)</Text>
               <TouchableOpacity
-                key={stylist.id}
-                style={[pc.stylistRow, person.stylistId === stylist.id && pc.stylistRowSel]}
-                onPress={() => selectStylist(stylist)}
+                style={[pc.stylistRow, !person.stylistId && pc.stylistRowSel]}
+                onPress={() => selectStylist(null)}
               >
-                <Text style={{ fontSize: 22 }}>💇</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[pc.stylistName, person.stylistId === stylist.id && { color: "#fff" }]}>
-                    {stylist.name}
-                  </Text>
-                  <Text style={[pc.stylistStatus, person.stylistId === stylist.id && { color: "#e5e7eb" }]}>
-                    {stylist.status === "available" ? "✅ Available" : "⏳ Busy"}
+                <Text style={{ fontSize: 22 }}>🎲</Text>
+                <Text style={[pc.stylistName, !person.stylistId && { color: "#fff" }]}>Any available</Text>
+              </TouchableOpacity>
+              {eligibleStylists.length === 0 ? (
+                <View style={pc.noStylistNote}>
+                  <Text style={pc.noStylistText}>
+                    No stylists available for your selected services. Any available stylist will be assigned.
                   </Text>
                 </View>
-              </TouchableOpacity>
-            ))}
-          </>}
+              ) : (
+                eligibleStylists.map((stylist) => (
+                  <TouchableOpacity
+                    key={stylist.id}
+                    style={[pc.stylistRow, person.stylistId === stylist.id && pc.stylistRowSel]}
+                    onPress={() => selectStylist(stylist)}
+                  >
+                    <Text style={{ fontSize: 22 }}>💇</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[pc.stylistName, person.stylistId === stylist.id && { color: "#fff" }]}>
+                        {stylist.name}
+                      </Text>
+                      <Text style={[pc.stylistStatus, person.stylistId === stylist.id && { color: "#e5e7eb" }]}>
+                        {stylist.status === "available" ? "✅ Available" : "⏳ Busy"}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+            </>;
+          })()}
 
           {/* Person subtotal */}
           {hasServices && (
@@ -161,6 +177,8 @@ const pc = StyleSheet.create({
   stylistRowSel:  { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
   stylistName:    { fontSize: 14, fontWeight: "600", color: "#1a1a2e" },
   stylistStatus:  { fontSize: 11, color: "#6b7280", marginTop: 1 },
+  noStylistNote:  { backgroundColor: "#fff7ed", borderRadius: 10, padding: 10, marginBottom: 6 },
+  noStylistText:  { fontSize: 12, color: "#d97706", lineHeight: 17 },
   subtotal:       { flexDirection: "row", justifyContent: "space-between", backgroundColor: "#f0fdf4", borderRadius: 10, padding: 10, marginTop: 12 },
   subtotalLabel:  { fontSize: 13, color: "#16a34a", fontWeight: "600" },
   subtotalValue:  { fontSize: 13, color: "#16a34a", fontWeight: "700" },
