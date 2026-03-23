@@ -167,7 +167,7 @@ function StylistPickerModal({ visible, onClose, onSelect, stylists, entryName })
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={sp.skipBtn} onPress={() => onSelect(null)}>
-          <Text style={sp.skipText}>Skip — start without assigning</Text>
+          <Text style={sp.skipText}>Skip — auto-assign first available stylist</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </Modal>
@@ -365,13 +365,23 @@ export default function QueueDashboard({ salonId, salon }) {
     setStylistPicker(null);
     if (!entry) return;
     try {
+      // If staff skipped, auto-assign first available stylist
+      let assignedStylist = stylist;
+      if (!assignedStylist) {
+        assignedStylist = (salon?.stylists || []).find(
+          (st) => st.status === "available"
+        ) || null;
+      }
+      const stylistId = assignedStylist?.id || null;
+
       await updateQueueEntry(salonId, entry.id, {
-        status:    "in-service",
-        stylistId: stylist?.id || null,
+        status:      "in-service",
+        stylistId:   stylistId,
+        stylistName: assignedStylist?.name || null,
       });
-      if (stylist?.id && salon?.stylists) {
+      if (stylistId && salon?.stylists) {
         const updated = salon.stylists.map((st) =>
-          st.id === stylist.id ? { ...st, status: "busy" } : st
+          st.id === stylistId ? { ...st, status: "busy" } : st
         );
         await saveSalon(salonId, { stylists: updated });
       }
