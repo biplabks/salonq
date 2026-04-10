@@ -1,10 +1,15 @@
 // apps/customer/src/screens/LoginScreen.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView,
 } from "react-native";
-import { loginWithEmail, registerWithEmail, saveCustomer } from "../firebase";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
+import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+import { loginWithEmail, registerWithEmail, saveCustomer, auth } from "../firebase";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,6 +18,19 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  });
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { id_token } = response.params;
+      const credential = GoogleAuthProvider.credential(id_token);
+      signInWithCredential(auth, credential)
+        .catch((err) => Alert.alert("Error", err.message));
+    }
+  }, [response]);
 
   const handleSubmit = async () => {
     if (!email || !password) { Alert.alert("Missing fields", "Please enter email and password."); return; }
@@ -62,6 +80,21 @@ export default function LoginScreen() {
         <TouchableOpacity style={s.btn} onPress={handleSubmit} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>{isLogin ? "Sign In" : "Create Account"}</Text>}
         </TouchableOpacity>
+
+        <View style={s.divider}>
+          <View style={s.dividerLine} />
+          <Text style={s.dividerText}>or</Text>
+          <View style={s.dividerLine} />
+        </View>
+
+        <TouchableOpacity
+          style={s.googleBtn}
+          onPress={() => promptAsync()}
+          disabled={!request}
+        >
+          <Text style={s.googleBtnIcon}>🔵</Text>
+          <Text style={s.googleBtnText}>Continue with Google</Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -82,4 +115,10 @@ const s = StyleSheet.create({
   input:           { backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#e5e7eb", borderRadius: 12, padding: 14, fontSize: 15, marginBottom: 12, color: "#1a1a2e" },
   btn:             { backgroundColor: "#1a1a2e", borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 8 },
   btnText:         { color: "#fff", fontSize: 16, fontWeight: "700" },
+  divider:         { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 16 },
+  dividerLine:     { flex: 1, height: 1, backgroundColor: "#e5e7eb" },
+  dividerText:     { fontSize: 13, color: "#6b7280" },
+  googleBtn:       { backgroundColor: "#fff", borderRadius: 14, paddingVertical: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 10, borderWidth: 1.5, borderColor: "#e5e7eb" },
+  googleBtnIcon:   { fontSize: 20 },
+  googleBtnText:   { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
 });

@@ -3,6 +3,7 @@ export default {
   expo: {
     name: "SalonQ",
     slug: "salonq-customer",
+    scheme: "salonq-customer",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",

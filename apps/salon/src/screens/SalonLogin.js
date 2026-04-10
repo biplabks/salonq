@@ -1,16 +1,34 @@
 // apps/salon/src/screens/SalonLogin.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from "react-native";
-import { loginWithEmail, registerOrLogin } from "../firebase";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
+import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+import { loginWithEmail, registerOrLogin, auth } from "../firebase";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function SalonLogin() {
   const [mode,     setMode]     = useState("login"); // "login" | "register"
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [loading,  setLoading]  = useState(false);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  });
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { id_token } = response.params;
+      const credential = GoogleAuthProvider.credential(id_token);
+      signInWithCredential(auth, credential)
+        .catch((err) => Alert.alert("Error", err.message));
+    }
+  }, [response]);
 
   const showError = (title, msg) => {
     if (Platform.OS === "web") window.alert(msg || title);
@@ -86,6 +104,21 @@ export default function SalonLogin() {
             : <Text style={s.btnText}>{mode === "login" ? "Sign In" : "Create Account →"}</Text>
           }
         </TouchableOpacity>
+
+        <View style={s.divider}>
+          <View style={s.dividerLine} />
+          <Text style={s.dividerText}>or</Text>
+          <View style={s.dividerLine} />
+        </View>
+
+        <TouchableOpacity
+          style={s.googleBtn}
+          onPress={() => promptAsync()}
+          disabled={!request}
+        >
+          <Text style={s.googleBtnIcon}>🔵</Text>
+          <Text style={s.googleBtnText}>Continue with Google</Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -105,4 +138,10 @@ const s = StyleSheet.create({
   input:            { backgroundColor: "#ffffff15", borderWidth: 1, borderColor: "#ffffff25", borderRadius: 12, padding: 14, fontSize: 15, color: "#fff", marginBottom: 12 },
   btn:              { backgroundColor: "#fff", borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 8 },
   btnText:          { color: "#1a1a2e", fontSize: 16, fontWeight: "800" },
+  divider:          { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 16 },
+  dividerLine:      { flex: 1, height: 1, backgroundColor: "#ffffff25" },
+  dividerText:      { fontSize: 13, color: "#6b7280" },
+  googleBtn:        { backgroundColor: "#fff", borderRadius: 14, paddingVertical: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 10, borderWidth: 1.5, borderColor: "#ffffff25" },
+  googleBtnIcon:    { fontSize: 20 },
+  googleBtnText:    { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
 });
