@@ -7,6 +7,6 @@
     "salon": "cd apps/salon && npx expo start"
   },
   "dependencies": {
-    "firebase-admin": "^13.7.0"
+    "firebase-admin": "^13.9.0"
   }
 }
