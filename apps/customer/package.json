@@ -25,12 +25,15 @@
     ],
     "reporters": [
       "default",
-      ["jest-html-reporters", {
-        "publicPath": "./test-report",
-        "filename": "index.html",
-        "pageTitle": "SalonQ Customer — Test Report",
-        "openReport": false
-      }]
+      [
+        "jest-html-reporters",
+        {
+          "publicPath": "./test-report",
+          "filename": "index.html",
+          "pageTitle": "SalonQ Customer — Test Report",
+          "openReport": false
+        }
+      ]
     ]
   },
   "dependencies": {
@@ -42,6 +45,7 @@
     "expo": "~54.0.0",
     "expo-auth-session": "^55.0.9",
     "expo-device": "~7.0.0",
+    "expo-linear-gradient": "~15.0.8",
     "expo-location": "~18.0.0",
     "expo-notifications": "~0.29.0",
     "expo-status-bar": "~2.0.0",

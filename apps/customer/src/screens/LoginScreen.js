@@ -4,6 +4,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
@@ -81,11 +82,16 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
-        <View style={s.brand}>
+        <LinearGradient
+          colors={["#667eea", "#764ba2"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={s.brand}
+        >
           <Text style={s.logo}>✂️</Text>
           <Text style={s.appName}>SalonQ</Text>
           <Text style={s.tagline}>Skip the wait. Walk in ready.</Text>
-        </View>
+        </LinearGradient>
 
         <View style={s.toggle}>
           <TouchableOpacity style={[s.toggleBtn, isLogin && s.toggleActive]} onPress={() => setIsLogin(true)}>
@@ -131,10 +137,10 @@ export default function LoginScreen() {
 const s = StyleSheet.create({
   container:       { flex: 1, backgroundColor: "#fafafa" },
   inner:           { flexGrow: 1, justifyContent: "center", paddingHorizontal: 28, paddingVertical: 40 },
-  brand:           { alignItems: "center", marginBottom: 36 },
+  brand:           { alignItems: "center", marginBottom: 32, marginHorizontal: -28, paddingVertical: 40, paddingHorizontal: 28, borderRadius: 24 },
   logo:            { fontSize: 56 },
-  appName:         { fontSize: 34, fontWeight: "800", color: "#1a1a2e", letterSpacing: -1 },
-  tagline:         { fontSize: 14, color: "#6b7280", marginTop: 4 },
+  appName:         { fontSize: 36, fontWeight: "900", color: "#fff", letterSpacing: -1, marginTop: 8 },
+  tagline:         { fontSize: 14, color: "rgba(255,255,255,0.75)", marginTop: 6 },
   toggle:          { flexDirection: "row", backgroundColor: "#f3f4f6", borderRadius: 12, padding: 4, marginBottom: 24 },
   toggleBtn:       { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 10 },
   toggleActive:    { backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },

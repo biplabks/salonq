@@ -4,9 +4,30 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, SafeAreaView,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { getSalon } from "../firebase";
 import { formatWait, isSalonOpen, formatPrice, DAYS, DAY_LABELS } from "../utils";
 import { useCurrentTime } from "../hooks/useCurrentTime";
+
+const CARD_GRADIENTS = [
+  ["#667eea", "#764ba2"],
+  ["#f953c6", "#b91d73"],
+  ["#4facfe", "#00f2fe"],
+  ["#43e97b", "#38f9d7"],
+  ["#fa709a", "#fee140"],
+  ["#30cfd0", "#667eea"],
+  ["#a18cd1", "#fbc2eb"],
+  ["#f7971e", "#ffd200"],
+];
+
+function getSalonGradient(id = "") {
+  const hash = [...id].reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return CARD_GRADIENTS[hash % CARD_GRADIENTS.length];
+}
+
+function getSalonInitials(name = "") {
+  return name.split(" ").slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "✂";
+}
 
 export default function SalonDetailScreen({ route, navigation }) {
   const now      = useCurrentTime();
@@ -22,7 +43,9 @@ export default function SalonDetailScreen({ route, navigation }) {
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#1a1a2e" /></View>;
   if (!salon)  return <View style={s.center}><Text>Salon not found.</Text></View>;
 
-  const open = isSalonOpen(salon.hours, now);
+  const open      = isSalonOpen(salon.hours, now);
+  const gradient  = getSalonGradient(salonId);
+  const initials  = getSalonInitials(salon.name);
 
   const stylists = (salon.stylists || []).map((st) => ({
     ...st, status: open ? st.status : "off",
@@ -37,26 +60,27 @@ export default function SalonDetailScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
-      <TouchableOpacity style={s.back} onPress={() => navigation.goBack()}>
-        <Text style={s.backText}>← Back</Text>
-      </TouchableOpacity>
-
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Hero */}
-        <View style={s.hero}>
-          <Text style={{ fontSize: 52 }}>✂️</Text>
+        {/* Gradient Hero */}
+        <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
+          <TouchableOpacity style={s.back} onPress={() => navigation.goBack()}>
+            <Text style={s.backText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={s.heroInitials}>{initials}</Text>
           <Text style={s.salonName}>{salon.name}</Text>
           <Text style={s.address}>{salon.address}</Text>
           <View style={s.statusRow}>
-            <View style={[s.statusDot, { backgroundColor: open ? "#16a34a" : "#9ca3af" }]} />
-            <Text style={{ color: open ? "#16a34a" : "#9ca3af", fontWeight: "600", fontSize: 14 }}>
-              {open ? "Open now" : "Closed"}
-            </Text>
+            <View style={[s.openPill, { backgroundColor: open ? "#16a34a" : "rgba(255,255,255,0.2)" }]}>
+              <View style={[s.openDot, { backgroundColor: open ? "#86efac" : "#d1d5db" }]} />
+              <Text style={s.openPillText}>{open ? "Open now" : "Closed"}</Text>
+            </View>
             {open && salon.avgWaitMin !== undefined && (
-              <Text style={s.waitText}>  •  ⏱ {formatWait(salon.avgWaitMin)} wait</Text>
+              <View style={s.waitPill}>
+                <Text style={s.waitPillText}>⏱ {formatWait(salon.avgWaitMin)} wait</Text>
+              </View>
             )}
           </View>
-        </View>
+        </LinearGradient>
 
         {/* Rating row */}
         {salon.avgRating ? (
@@ -172,14 +196,18 @@ export default function SalonDetailScreen({ route, navigation }) {
 const s = StyleSheet.create({
   container:        { flex: 1, backgroundColor: "#fafafa" },
   center:           { flex: 1, alignItems: "center", justifyContent: "center" },
-  back:             { paddingHorizontal: 20, paddingTop: 12 },
-  backText:         { fontSize: 15, color: "#1a1a2e", fontWeight: "600" },
-  hero:             { alignItems: "center", paddingVertical: 24, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
-  salonName:        { fontSize: 24, fontWeight: "800", color: "#1a1a2e", textAlign: "center", marginTop: 8 },
-  address:          { fontSize: 13, color: "#6b7280", marginTop: 4, textAlign: "center" },
-  statusRow:        { flexDirection: "row", alignItems: "center", marginTop: 10 },
-  statusDot:        { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  waitText:         { fontSize: 13, color: "#6b7280" },
+  hero:             { paddingTop: 16, paddingBottom: 28, paddingHorizontal: 20, alignItems: "center" },
+  back:             { alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 16 },
+  backText:         { fontSize: 14, color: "#fff", fontWeight: "700" },
+  heroInitials:     { fontSize: 64, fontWeight: "900", color: "rgba(255,255,255,0.25)", letterSpacing: -3, marginBottom: 4 },
+  salonName:        { fontSize: 26, fontWeight: "800", color: "#fff", textAlign: "center" },
+  address:          { fontSize: 13, color: "rgba(255,255,255,0.75)", marginTop: 4, textAlign: "center", marginBottom: 14 },
+  statusRow:        { flexDirection: "row", alignItems: "center", gap: 8 },
+  openPill:         { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  openDot:          { width: 6, height: 6, borderRadius: 3 },
+  openPillText:     { fontSize: 12, color: "#fff", fontWeight: "700" },
+  waitPill:         { backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  waitPillText:     { fontSize: 12, color: "#fff", fontWeight: "600" },
   ratingRow:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
   ratingLeft:       { flexDirection: "row", alignItems: "center", gap: 6 },
   ratingStar:       { fontSize: 20, color: "#F59E0B" },
