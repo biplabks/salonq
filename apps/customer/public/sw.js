@@ -1,4 +1,4 @@
-const CACHE = 'salonq-customer-v1';
+const CACHE = 'salonq-customer-BUILD_ID';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
