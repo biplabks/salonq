@@ -1,6 +1,7 @@
 // apps/salon/App.js
 import "react-native-gesture-handler";
 import React, { useState, useEffect } from "react";
+import { Platform } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -24,6 +25,12 @@ export default function App() {
   const [salon,   setSalon]   = useState(null);
   const [salonId, setSalonId] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
+    }
+  }, []);
 
   useEffect(() => {
     return onAuthChange(async (u) => {

@@ -11,6 +11,29 @@ import { loginWithEmail, registerOrLogin, auth } from "../firebase";
 
 WebBrowser.maybeCompleteAuthSession();
 
+function authErrorMessage(code) {
+  switch (code) {
+    case "auth/invalid-credential":
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+      return "Incorrect email or password. Please try again.";
+    case "auth/email-already-in-use":
+      return "An account with this email already exists. Try signing in instead.";
+    case "auth/weak-password":
+      return "Password must be at least 6 characters.";
+    case "auth/invalid-email":
+      return "Please enter a valid email address.";
+    case "auth/too-many-requests":
+      return "Too many failed attempts. Please wait a moment and try again.";
+    case "auth/network-request-failed":
+      return "Network error. Check your connection and try again.";
+    case "auth/user-disabled":
+      return "This account has been disabled. Please contact support.";
+    default:
+      return "Something went wrong. Please try again.";
+  }
+}
+
 export default function SalonLogin() {
   const [mode,     setMode]     = useState("login"); // "login" | "register"
   const [email,    setEmail]    = useState("");
@@ -26,7 +49,7 @@ export default function SalonLogin() {
       const { id_token } = response.params;
       const credential = GoogleAuthProvider.credential(id_token);
       signInWithCredential(auth, credential)
-        .catch((err) => Alert.alert("Error", err.message));
+        .catch((err) => showError("Sign-in failed", authErrorMessage(err.code)));
     }
   }, [response]);
 
@@ -48,7 +71,7 @@ export default function SalonLogin() {
         await registerOrLogin(email, password);
       }
     } catch (err) {
-      showError(mode === "login" ? "Login failed" : "Registration failed", err.message);
+      showError(mode === "login" ? "Sign-in failed" : "Registration failed", authErrorMessage(err.code));
     } finally {
       setLoading(false);
     }

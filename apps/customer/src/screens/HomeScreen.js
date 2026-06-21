@@ -86,6 +86,9 @@ export default function HomeScreen({ navigation }) {
   const renderSalon = ({ item }) => {
     const open     = isSalonOpen(item.hours, now);
     const distance = getDistance(item);
+    const hasRating = item.avgRating > 0 && item.totalRatings > 0;
+    const fullStars = hasRating ? Math.round(item.avgRating) : 0;
+
     return (
       <TouchableOpacity
         style={s.card}
@@ -103,6 +106,20 @@ export default function HomeScreen({ navigation }) {
               {open ? "Open" : "Closed"}
             </Text>
           </View>
+
+          {/* Rating row */}
+          {hasRating ? (
+            <View style={s.ratingRow}>
+              <Text style={s.stars}>
+                {[1,2,3,4,5].map((i) => i <= fullStars ? "★" : "☆").join("")}
+              </Text>
+              <Text style={s.ratingNum}>{item.avgRating.toFixed(1)}</Text>
+              <Text style={s.ratingCount}>({item.totalRatings} {item.totalRatings === 1 ? "review" : "reviews"})</Text>
+            </View>
+          ) : (
+            <Text style={s.noRating}>No reviews yet</Text>
+          )}
+
           <Text style={s.addr}>{item.address}</Text>
           <View style={s.badges}>
             {open && item.queueCount !== undefined && (
@@ -189,6 +206,11 @@ const s = StyleSheet.create({
   body:             { padding: 16 },
   row:              { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
   name:             { fontSize: 17, fontWeight: "700", color: "#1a1a2e", flex: 1 },
+  ratingRow:        { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4 },
+  stars:            { fontSize: 13, color: "#F59E0B", letterSpacing: 1 },
+  ratingNum:        { fontSize: 13, fontWeight: "700", color: "#1a1a2e" },
+  ratingCount:      { fontSize: 12, color: "#9ca3af" },
+  noRating:         { fontSize: 12, color: "#d1d5db", marginBottom: 4 },
   addr:             { fontSize: 13, color: "#6b7280", marginBottom: 10 },
   badges:           { flexDirection: "row", gap: 6, flexWrap: "wrap" },
   badge:            { backgroundColor: "#f3f4f6", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },

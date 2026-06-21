@@ -157,11 +157,15 @@ export default function QueueTrackerScreen({ route, navigation }) {
     );
   }
 
-  const statusColor = STATUS_COLORS[entry.status] || "#6b7280";
-  const statusLabel = STATUS_LABELS[entry.status] || entry.status;
-  const isCalled    = entry.status === "called";
-  const isDone      = entry.status === "done" || entry.status === "no-show";
-  const isNext      = entry.position === 1 && entry.status === "waiting";
+  const statusColor      = STATUS_COLORS[entry.status] || "#6b7280";
+  const statusLabel      = STATUS_LABELS[entry.status] || entry.status;
+  const isCalled         = entry.status === "called";
+  const isNoShow         = entry.status === "no-show";
+  const isPaid           = entry.paymentStatus === "paid";
+  const isPaymentPending = entry.status === "done" && !isPaid;
+  const isCompleted      = entry.status === "done" && isPaid;
+  const isDone           = isCompleted || isNoShow;
+  const isNext           = entry.position === 1 && entry.status === "waiting";
 
   return (
     <SafeAreaView style={s.container}>
@@ -193,10 +197,20 @@ export default function QueueTrackerScreen({ route, navigation }) {
           )
         )}
 
-        {isDone && (
-          <Text style={s.doneText}>
-            {entry.status === "done" ? "✅ Thanks for visiting!" : "Your spot was given away."}
-          </Text>
+        {isPaymentPending && (
+          <View style={s.paymentPendingBox}>
+            <Text style={s.paymentPendingEmoji}>💳</Text>
+            <Text style={s.paymentPendingTitle}>Payment required</Text>
+            <Text style={s.paymentPendingSub}>Please pay at the counter before leaving</Text>
+          </View>
+        )}
+
+        {isCompleted && (
+          <Text style={s.doneText}>✅ Thanks for visiting!</Text>
+        )}
+
+        {isNoShow && (
+          <Text style={s.doneText}>Your spot was given away.</Text>
         )}
 
         {entry.joinedAt && (
@@ -224,8 +238,8 @@ export default function QueueTrackerScreen({ route, navigation }) {
         </View>
       )}
 
-      {/* View Receipt button when done */}
-      {entry.status === "done" && (
+      {/* View Receipt — only after payment confirmed */}
+      {isCompleted && (
         <TouchableOpacity style={s.receiptBtn} onPress={handleViewReceipt}>
           <Text style={s.receiptBtnText}>🧾 View Receipt</Text>
         </TouchableOpacity>
@@ -262,7 +276,11 @@ const s = StyleSheet.create({
   waitTime:       { fontSize: 28, fontWeight: "800" },
   joinedAt:       { fontSize: 12, color: "#9ca3af", marginTop: 16 },
   nextText:       { fontSize: 28, fontWeight: "900", color: "#16a34a", textAlign: "center" },
-  doneText:       { fontSize: 20, fontWeight: "700", color: "#1a1a2e", textAlign: "center" },
+  doneText:            { fontSize: 20, fontWeight: "700", color: "#1a1a2e", textAlign: "center" },
+  paymentPendingBox:   { alignItems: "center", gap: 6 },
+  paymentPendingEmoji: { fontSize: 36 },
+  paymentPendingTitle: { fontSize: 18, fontWeight: "800", color: "#1a1a2e" },
+  paymentPendingSub:   { fontSize: 13, color: "#6b7280", textAlign: "center" },
   summaryCard:    { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: "#e5e7eb" },
   summaryTitle:   { fontSize: 13, color: "#6b7280", marginBottom: 10, fontWeight: "600" },
   summaryRow:     { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4 },

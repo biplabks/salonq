@@ -4,7 +4,11 @@
   "private": true,
   "scripts": {
     "customer": "cd apps/customer && npx expo start",
-    "salon": "cd apps/salon && npx expo start"
+    "customer:web": "cd apps/customer && npx expo start --web",
+    "customer:build:web": "cd apps/customer && npx expo export --platform web",
+    "salon": "cd apps/salon && npx expo start",
+    "salon:web": "cd apps/salon && npx expo start --web",
+    "salon:build:web": "cd apps/salon && npx expo export --platform web"
   },
   "dependencies": {
     "firebase-admin": "^13.9.0"

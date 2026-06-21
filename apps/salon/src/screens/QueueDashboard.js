@@ -62,64 +62,90 @@ function GroupStylistModal({ visible, onClose, onConfirm, entry, stylists }) {
     }));
   };
 
+  const assignedCount = Object.values(assignments).filter((a) => a !== undefined).length;
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={gm.container}>
         <View style={gm.header}>
-          <Text style={gm.title}>Assign Stylists</Text>
-          <TouchableOpacity onPress={onClose}><Text style={gm.close}>✕</Text></TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={gm.title}>Assign Stylists</Text>
+            <Text style={gm.sub}>Group of {members.length} — one stylist per person</Text>
+          </View>
+          <TouchableOpacity style={gm.closeBtn} onPress={onClose}>
+            <Text style={gm.closeIcon}>✕</Text>
+          </TouchableOpacity>
         </View>
-        <Text style={gm.sub}>Assign a stylist to each person in this group</Text>
+
+        {/* Progress bar */}
+        <View style={gm.progressBar}>
+          <View style={[gm.progressFill, { width: `${(assignedCount / Math.max(members.length, 1)) * 100}%` }]} />
+        </View>
+        <Text style={gm.progressText}>{assignedCount} of {members.length} assigned</Text>
 
         <ScrollView contentContainerStyle={gm.content}>
-          {members.map((member) => {
+          {members.map((member, index) => {
             const assignment = assignments[member.id] || {};
+            const isDone = !!assignment.stylistId || assignment.stylistId === null && assignments[member.id] !== undefined;
             return (
-              <View key={member.id} style={gm.memberSection}>
+              <View key={member.id} style={[gm.memberCard, isDone && gm.memberCardDone]}>
+                {/* Person row */}
                 <View style={gm.memberHeader}>
-                  <Text style={{ fontSize: 22 }}>
-                    {member.isSelf ? "😊" : (RELATIONSHIP_EMOJI[member.relationship] || "👤")}
-                  </Text>
+                  <View style={gm.memberAvatar}>
+                    <Text style={{ fontSize: 20 }}>
+                      {member.isSelf ? "😊" : (RELATIONSHIP_EMOJI[member.relationship] || "👤")}
+                    </Text>
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={gm.memberName}>{member.name}</Text>
-                    <Text style={gm.memberServices}>
+                    <Text style={gm.memberServices} numberOfLines={1}>
                       {(member.services || []).map((sv) => sv.name).join(", ")}
                     </Text>
                   </View>
-                  {assignment.stylistName && (
+                  {assignment.stylistName !== undefined && (
                     <View style={gm.assignedBadge}>
-                      <Text style={gm.assignedText}>✓ {assignment.stylistName}</Text>
+                      <Text style={gm.assignedText}>
+                        {assignment.stylistName ? `✓ ${assignment.stylistName}` : "✓ Any"}
+                      </Text>
                     </View>
                   )}
                 </View>
 
-                <View style={gm.stylistOptions}>
+                {/* Stylist chips */}
+                <View style={gm.chipsRow}>
                   <TouchableOpacity
-                    style={[gm.stylistPill, !assignment.stylistId && gm.stylistPillSel]}
+                    style={[gm.chip, assignment.stylistId === null && assignments[member.id] !== undefined && gm.chipSel]}
                     onPress={() => assignStylist(member.id, null)}
                   >
-                    <Text style={[gm.stylistPillText, !assignment.stylistId && { color: "#fff" }]}>Any</Text>
+                    <Text style={[gm.chipText, assignment.stylistId === null && assignments[member.id] !== undefined && gm.chipTextSel]}>
+                      Any
+                    </Text>
                   </TouchableOpacity>
-                  {(stylists || []).filter((s) => s.status !== "off").map((stylist) => (
-                    <TouchableOpacity
-                      key={stylist.id}
-                      style={[gm.stylistPill, assignment.stylistId === stylist.id && gm.stylistPillSel]}
-                      onPress={() => assignStylist(member.id, stylist)}
-                    >
-                      <Text style={[gm.stylistPillText, assignment.stylistId === stylist.id && { color: "#fff" }]}>
-                        {stylist.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {(stylists || []).filter((s) => s.status !== "off").map((stylist) => {
+                    const selected = assignment.stylistId === stylist.id;
+                    const isAvailable = stylist.status === "available";
+                    return (
+                      <TouchableOpacity
+                        key={stylist.id}
+                        style={[gm.chip, selected && gm.chipSel]}
+                        onPress={() => assignStylist(member.id, stylist)}
+                      >
+                        <View style={[gm.chipDot, { backgroundColor: isAvailable ? "#16a34a" : "#f59e0b" }]} />
+                        <Text style={[gm.chipText, selected && gm.chipTextSel]}>{stylist.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             );
           })}
-
-          <TouchableOpacity style={gm.confirmBtn} onPress={() => onConfirm(assignments)}>
-            <Text style={gm.confirmBtnText}>Start Services →</Text>
-          </TouchableOpacity>
         </ScrollView>
+
+        <View style={gm.footer}>
+          <TouchableOpacity style={gm.confirmBtn} onPress={() => onConfirm(assignments)}>
+            <Text style={gm.confirmBtnText}>Start Services for {members.length} →</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     </Modal>
   );
@@ -127,65 +153,112 @@ function GroupStylistModal({ visible, onClose, onConfirm, entry, stylists }) {
 
 const gm = StyleSheet.create({
   container:      { flex: 1, backgroundColor: "#fafafa" },
-  header:         { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderBottomColor: "#f3f4f6" },
+  header:         { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "#f3f4f6", backgroundColor: "#fff" },
   title:          { fontSize: 20, fontWeight: "800", color: "#1a1a2e" },
-  close:          { fontSize: 20, color: "#6b7280" },
-  sub:            { fontSize: 13, color: "#6b7280", paddingHorizontal: 20, paddingTop: 8 },
-  content:        { padding: 16, gap: 4, paddingBottom: 40 },
-  memberSection:  { backgroundColor: "#fff", borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: "#e5e7eb" },
-  memberHeader:   { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
-  memberName:     { fontSize: 14, fontWeight: "700", color: "#1a1a2e" },
+  sub:            { fontSize: 13, color: "#6b7280", marginTop: 2 },
+  closeBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" },
+  closeIcon:      { fontSize: 14, color: "#6b7280", fontWeight: "700" },
+  progressBar:    { height: 4, backgroundColor: "#f3f4f6" },
+  progressFill:   { height: 4, backgroundColor: "#1a1a2e", borderRadius: 2 },
+  progressText:   { fontSize: 12, color: "#6b7280", textAlign: "center", paddingVertical: 8, fontWeight: "600" },
+  content:        { padding: 16, gap: 12, paddingBottom: 24 },
+  memberCard:     { backgroundColor: "#fff", borderRadius: 16, padding: 16, borderWidth: 1, borderColor: "#e5e7eb" },
+  memberCardDone: { borderColor: "#bbf7d0" },
+  memberHeader:   { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  memberAvatar:   { width: 44, height: 44, borderRadius: 14, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" },
+  memberName:     { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
   memberServices: { fontSize: 12, color: "#6b7280", marginTop: 2 },
   assignedBadge:  { backgroundColor: "#dcfce7", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  assignedText:   { fontSize: 11, color: "#16a34a", fontWeight: "600" },
-  stylistOptions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  stylistPill:    { backgroundColor: "#f3f4f6", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1.5, borderColor: "#e5e7eb" },
-  stylistPillSel: { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
-  stylistPillText:{ fontSize: 13, color: "#6b7280", fontWeight: "500" },
-  confirmBtn:     { backgroundColor: "#1a1a2e", borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 16 },
-  confirmBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  assignedText:   { fontSize: 11, color: "#16a34a", fontWeight: "700" },
+  chipsRow:       { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip:           { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#f3f4f6", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1.5, borderColor: "#e5e7eb" },
+  chipSel:        { backgroundColor: "#1a1a2e", borderColor: "#1a1a2e" },
+  chipText:       { fontSize: 13, color: "#6b7280", fontWeight: "500" },
+  chipTextSel:    { color: "#fff", fontWeight: "700" },
+  chipDot:        { width: 6, height: 6, borderRadius: 3 },
+  footer:         { padding: 16, borderTopWidth: 1, borderTopColor: "#f3f4f6", backgroundColor: "#fff" },
+  confirmBtn:     { backgroundColor: "#1a1a2e", borderRadius: 14, paddingVertical: 16, alignItems: "center" },
+  confirmBtnText: { color: "#fff", fontSize: 15, fontWeight: "800" },
 });
 
 // ── Single Stylist Picker Modal ────────────────────────────────────────────────
 function StylistPickerModal({ visible, onClose, onSelect, stylists, entryName }) {
+  const available = (stylists || []).filter((s) => s.status !== "off");
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={sp.container}>
         <View style={sp.header}>
-          <Text style={sp.title}>Assign Stylist</Text>
-          <TouchableOpacity onPress={onClose}><Text style={sp.close}>✕</Text></TouchableOpacity>
-        </View>
-        <Text style={sp.sub}>Who is serving {entryName}?</Text>
-        {(stylists || []).filter((s) => s.status !== "off").map((stylist) => (
-          <TouchableOpacity key={stylist.id} style={sp.row} onPress={() => onSelect(stylist)}>
-            <View style={sp.avatar}><Text style={{ fontSize: 22 }}>💇</Text></View>
-            <View style={{ flex: 1 }}>
-              <Text style={sp.name}>{stylist.name}</Text>
-              <Text style={sp.status}>{stylist.status === "available" ? "✅ Available" : "⏳ Busy"}</Text>
-            </View>
-            <Text style={{ fontSize: 22, color: "#9ca3af" }}>›</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={sp.title}>Assign Stylist</Text>
+            {entryName ? <Text style={sp.sub}>Serving {entryName}</Text> : null}
+          </View>
+          <TouchableOpacity style={sp.closeBtn} onPress={onClose}>
+            <Text style={sp.closeIcon}>✕</Text>
           </TouchableOpacity>
-        ))}
-        <TouchableOpacity style={sp.skipBtn} onPress={() => onSelect(null)}>
-          <Text style={sp.skipText}>Skip — auto-assign first available stylist</Text>
-        </TouchableOpacity>
+        </View>
+
+        <ScrollView contentContainerStyle={sp.content}>
+          {available.map((stylist) => {
+            const isAvailable = stylist.status === "available";
+            return (
+              <TouchableOpacity key={stylist.id} style={sp.row} onPress={() => onSelect(stylist)}>
+                <View style={sp.avatar}>
+                  <Text style={{ fontSize: 24 }}>💇</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={sp.name}>{stylist.name}</Text>
+                  <View style={sp.statusRow}>
+                    <View style={[sp.dot, { backgroundColor: isAvailable ? "#16a34a" : "#f59e0b" }]} />
+                    <Text style={[sp.statusText, { color: isAvailable ? "#16a34a" : "#d97706" }]}>
+                      {isAvailable ? "Available" : "Busy"}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={sp.arrow}>›</Text>
+              </TouchableOpacity>
+            );
+          })}
+
+          {available.length === 0 && (
+            <View style={sp.empty}>
+              <Text style={sp.emptyEmoji}>😔</Text>
+              <Text style={sp.emptyText}>No stylists available</Text>
+            </View>
+          )}
+        </ScrollView>
+
+        <View style={sp.footer}>
+          <TouchableOpacity style={sp.skipBtn} onPress={() => onSelect(null)}>
+            <Text style={sp.skipText}>Auto-assign first available stylist</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     </Modal>
   );
 }
 
 const sp = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fafafa", padding: 20 },
-  header:    { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
-  title:     { fontSize: 22, fontWeight: "800", color: "#1a1a2e" },
-  close:     { fontSize: 20, color: "#6b7280" },
-  sub:       { fontSize: 14, color: "#6b7280", marginBottom: 20 },
-  row:       { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: "#e5e7eb", gap: 12 },
-  avatar:    { width: 46, height: 46, borderRadius: 14, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" },
-  name:      { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
-  status:    { fontSize: 12, color: "#6b7280", marginTop: 2 },
-  skipBtn:   { alignItems: "center", paddingVertical: 16 },
-  skipText:  { fontSize: 14, color: "#9ca3af" },
+  container:  { flex: 1, backgroundColor: "#fafafa" },
+  header:     { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "#f3f4f6", backgroundColor: "#fff" },
+  title:      { fontSize: 20, fontWeight: "800", color: "#1a1a2e" },
+  sub:        { fontSize: 13, color: "#6b7280", marginTop: 2 },
+  closeBtn:   { width: 36, height: 36, borderRadius: 18, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" },
+  closeIcon:  { fontSize: 14, color: "#6b7280", fontWeight: "700" },
+  content:    { padding: 16, gap: 10, paddingBottom: 24 },
+  row:        { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 16, padding: 16, borderWidth: 1, borderColor: "#e5e7eb", gap: 14 },
+  avatar:     { width: 52, height: 52, borderRadius: 16, backgroundColor: "#f3f4f6", alignItems: "center", justifyContent: "center" },
+  name:       { fontSize: 15, fontWeight: "700", color: "#1a1a2e" },
+  statusRow:  { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
+  dot:        { width: 7, height: 7, borderRadius: 4 },
+  statusText: { fontSize: 12, fontWeight: "600" },
+  arrow:      { fontSize: 22, color: "#d1d5db" },
+  empty:      { alignItems: "center", paddingVertical: 40, gap: 8 },
+  emptyEmoji: { fontSize: 36 },
+  emptyText:  { fontSize: 14, color: "#9ca3af" },
+  footer:     { padding: 16, borderTopWidth: 1, borderTopColor: "#f3f4f6", backgroundColor: "#fff" },
+  skipBtn:    { backgroundColor: "#f3f4f6", borderRadius: 12, paddingVertical: 14, alignItems: "center" },
+  skipText:   { fontSize: 14, color: "#6b7280", fontWeight: "600" },
 });
 
 // ── Walk-in Modal ─────────────────────────────────────────────────────────────

@@ -11,6 +11,34 @@ import { loginWithEmail, registerWithEmail, saveCustomer, auth } from "../fireba
 
 WebBrowser.maybeCompleteAuthSession();
 
+function showError(title, msg) {
+  if (Platform.OS === "web") window.alert(msg || title);
+  else Alert.alert(title, msg);
+}
+
+function authErrorMessage(code) {
+  switch (code) {
+    case "auth/invalid-credential":
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+      return "Incorrect email or password. Please try again.";
+    case "auth/email-already-in-use":
+      return "An account with this email already exists. Try signing in instead.";
+    case "auth/weak-password":
+      return "Password must be at least 6 characters.";
+    case "auth/invalid-email":
+      return "Please enter a valid email address.";
+    case "auth/too-many-requests":
+      return "Too many failed attempts. Please wait a moment and try again.";
+    case "auth/network-request-failed":
+      return "Network error. Check your connection and try again.";
+    case "auth/user-disabled":
+      return "This account has been disabled. Please contact support.";
+    default:
+      return "Something went wrong. Please try again.";
+  }
+}
+
 export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState("");
@@ -28,23 +56,23 @@ export default function LoginScreen() {
       const { id_token } = response.params;
       const credential = GoogleAuthProvider.credential(id_token);
       signInWithCredential(auth, credential)
-        .catch((err) => Alert.alert("Error", err.message));
+        .catch((err) => showError("Sign-in failed", authErrorMessage(err.code)));
     }
   }, [response]);
 
   const handleSubmit = async () => {
-    if (!email || !password) { Alert.alert("Missing fields", "Please enter email and password."); return; }
+    if (!email || !password) { showError("Missing fields", "Please enter email and password."); return; }
     setLoading(true);
     try {
       if (isLogin) {
         await loginWithEmail(email, password);
       } else {
-        if (!name) { Alert.alert("Missing name"); setLoading(false); return; }
+        if (!name) { showError("Missing name", "Please enter your full name."); setLoading(false); return; }
         const cred = await registerWithEmail(email, password);
         await saveCustomer(cred.user.uid, { name, email, phone, familyMembers: [] });
       }
     } catch (err) {
-      Alert.alert("Error", err.message);
+      showError(isLogin ? "Sign-in failed" : "Registration failed", authErrorMessage(err.code));
     } finally {
       setLoading(false);
     }

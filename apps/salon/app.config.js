@@ -1,9 +1,9 @@
-// apps/customer/app.config.js
+// apps/salon/app.config.js
 export default {
   expo: {
-    name: "SalonQ",
-    slug: "salonq-customer",
-    scheme: "salonq-customer",
+    name: "SalonQ Dashboard",
+    slug: "salonq-salon",
+    scheme: "salonq-salon",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -16,38 +16,25 @@ export default {
     assetBundlePatterns: ["**/*"],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.salonq.customer",
-      config: {
-        googleMapsApiKey: process.env.GOOGLE_MAPS_IOS_API_KEY,
-      },
+      bundleIdentifier: "com.salonq.salon",
     },
     android: {
+      package: "com.salonq.salon",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#1a1a2e",
-      },
-      package: "com.salonq.customer",
-      config: {
-        googleMaps: {
-          apiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
-        },
       },
     },
     web: {
       favicon: "./assets/favicon.png",
       bundler: "metro",
-      name: "SalonQ",
+      name: "SalonQ Dashboard",
       shortName: "SalonQ",
-      description: "Find and join salon queues near you",
+      description: "Manage your salon queue and operations",
       themeColor: "#1a1a2e",
       backgroundColor: "#1a1a2e",
       lang: "en",
       display: "standalone",
-    },
-    extra: {
-      eas: {
-        projectId: "4ec2cd8f-26df-426c-b411-06d1e9883648",
-      },
     },
   },
 };
