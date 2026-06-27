@@ -25,10 +25,7 @@ service cloud.firestore {
     match /salons/{salonId} {
       allow read: if true;
       allow create: if isAuth();
-      allow update: if isSalonStaff(salonId) || isSalonOwner(salonId) ||
-        (isAuth() &&
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["avgRating", "totalRatings", "totalScore"]));
+      allow update: if isSalonStaff(salonId) || isSalonOwner(salonId);
       allow delete: if isSalonOwner(salonId);
 
       match /queue/{entryId} {
@@ -70,8 +67,8 @@ service cloud.firestore {
 
       match /visits/{visitId} {
         allow read:   if isOwner(userId);
-        allow create: if isAuth();
-        allow update: if isAuth();
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
         allow delete: if isOwner(userId);
       }
     }

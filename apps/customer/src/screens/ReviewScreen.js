@@ -7,8 +7,7 @@ import {
   TouchableOpacity, TextInput, ActivityIndicator, Alert,
 } from "react-native";
 import {
-  collection, addDoc, doc, updateDoc,
-  serverTimestamp, runTransaction,
+  collection, addDoc, doc, updateDoc, serverTimestamp,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
@@ -68,21 +67,6 @@ export default function ReviewScreen({ route, navigation }) {
 
       await updateDoc(doc(db, "salons", salonId, "queue", entryId), { reviewed: true });
 
-      // Atomically update salon avg rating
-      await runTransaction(db, async (tx) => {
-        const salonRef  = doc(db, "salons", salonId);
-        const salonSnap = await tx.get(salonRef);
-        if (salonSnap.exists()) {
-          const data         = salonSnap.data();
-          const totalRatings = (data.totalRatings || 0) + 1;
-          const totalScore   = (data.totalScore   || 0) + salonRating;
-          tx.update(salonRef, {
-            avgRating: Math.round((totalScore / totalRatings) * 10) / 10,
-            totalRatings,
-            totalScore,
-          });
-        }
-      });
       setSubmitted(true);
     } catch (err) {
       Alert.alert("Error", err.message);
