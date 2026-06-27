@@ -7,7 +7,7 @@ import {
   createUserWithEmailAndPassword, signOut, onAuthStateChanged,
 } from "firebase/auth";
 import {
-  getFirestore, collection, doc, getDoc, getDocs, setDoc,
+  getFirestore, collection, collectionGroup, doc, getDoc, getDocs, setDoc,
   updateDoc, addDoc, query, where, orderBy, onSnapshot,
   serverTimestamp, getCountFromServer,
 } from "firebase/firestore";
@@ -63,6 +63,20 @@ export const joinQueue = async ({
 }) => {
   const queueRef      = collection(db, "salons", salonId, "queue");
   const totalDuration = services.reduce((s, sv) => s + (sv.durationMin || 30), 0);
+
+  // Block if customer already has an active entry anywhere
+  if (customerId) {
+    const activeSnap = await getCountFromServer(
+      query(
+        collectionGroup(db, "queue"),
+        where("customerId", "==", customerId),
+        where("status", "in", ["waiting", "called", "in-service"])
+      )
+    );
+    if (activeSnap.data().count > 0) {
+      throw new Error("You are already in a queue. Please complete or cancel your current visit first.");
+    }
+  }
 
   // Count current waiting entries for position (no composite index needed)
   const countSnap = await getCountFromServer(

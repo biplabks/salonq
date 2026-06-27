@@ -1,15 +1,21 @@
 // apps/customer/src/screens/CheckInScreen.js
 // Per-person services + stylist selection for group bookings
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, SafeAreaView, BackHandler,
+  ActivityIndicator, Alert, SafeAreaView, BackHandler, Platform,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { getAuth } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { joinQueue, getCustomer } from "../firebase";
 import { formatPrice, formatWait, calcEstimatedWait } from "../utils";
+
+const showError = (title, msg) => {
+  if (Platform.OS === "web") window.alert(msg || title);
+  else Alert.alert(title, msg);
+};
 
 // Turn "biplab.saha" or "biplab_saha" → "Biplab Saha"
 const formatEmailName = (email) =>
@@ -187,14 +193,28 @@ const pc = StyleSheet.create({
 // ── Main CheckIn Screen ───────────────────────────────────────────────────────
 export default function CheckInScreen({ route, navigation }) {
   const { salon } = route.params;
-  const [step,           setStep]           = useState(1);
-  const [persons,        setPersons]        = useState([]);
-  const [selfSelected,   setSelfSelected]   = useState(true);
-  const [familyMembers,  setFamilyMembers]  = useState([]);
-  const [selectedFamily, setSelectedFamily] = useState([]);
-  const [loading,        setLoading]        = useState(false);
+  const [step,                 setStep]                 = useState(1);
+  const [persons,              setPersons]              = useState([]);
+  const [selfSelected,         setSelfSelected]         = useState(true);
+  const [familyMembers,        setFamilyMembers]        = useState([]);
+  const [selectedFamily,       setSelectedFamily]       = useState([]);
+  const [loading,              setLoading]              = useState(false);
+  const [blockedByActiveQueue, setBlockedByActiveQueue] = useState(false);
+  const [activeQueueSalonName, setActiveQueueSalonName] = useState("");
 
   const user = getAuth().currentUser;
+
+  useFocusEffect(useCallback(() => {
+    AsyncStorage.getItem("activeQueue").then((val) => {
+      if (val) {
+        const parsed = JSON.parse(val);
+        setActiveQueueSalonName(parsed.salonName || "another salon");
+        setBlockedByActiveQueue(true);
+      } else {
+        setBlockedByActiveQueue(false);
+      }
+    }).catch(() => {});
+  }, []));
 
   useEffect(() => {
     if (user) {
@@ -342,13 +362,38 @@ export default function CheckInScreen({ route, navigation }) {
         }],
       });
     } catch (err) {
-      Alert.alert("Error", err.message);
+      showError("Could not join queue", err.message);
     } finally {
       setLoading(false);
     }
   };
 
   const STEPS = hasWhoStep ? ["Who", "Services", "Confirm"] : ["Services", "Confirm"];
+
+  if (blockedByActiveQueue) {
+    return (
+      <SafeAreaView style={s.container}>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32 }}>
+          <Text style={{ fontSize: 48, marginBottom: 16 }}>⚠️</Text>
+          <Text style={{ fontSize: 18, fontWeight: "700", color: "#1a1a2e", textAlign: "center", marginBottom: 12 }}>
+            You're already in a queue
+          </Text>
+          <Text style={{ fontSize: 14, color: "#6b7280", textAlign: "center", marginBottom: 32 }}>
+            You have an active booking at {activeQueueSalonName}. Please complete or cancel it before joining a new queue.
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: "#1a1a2e", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32, marginBottom: 12 }}
+            onPress={() => navigation.navigate("Queue")}
+          >
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>View Current Queue</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={{ color: "#6b7280", fontSize: 14, marginTop: 8 }}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={s.container}>

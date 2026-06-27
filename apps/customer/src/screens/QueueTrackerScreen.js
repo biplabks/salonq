@@ -53,12 +53,14 @@ export default function QueueTrackerScreen({ route, navigation }) {
 
   const { entry, loading } = useQueueEntry(activeQueue?.salonId, activeQueue?.entryId);
 
-  // Auto-clear AsyncStorage when the entry is done/no-show so the customer can join again
+  // Clear AsyncStorage only when fully complete: paid+done OR no-show
   useEffect(() => {
-    if (entry && (entry.status === "done" || entry.status === "no-show")) {
+    if (!entry) return;
+    const isCompleted = entry.status === "done" && entry.paymentStatus === "paid";
+    if (isCompleted || entry.status === "no-show") {
       AsyncStorage.removeItem("activeQueue").catch(() => {});
     }
-  }, [entry?.status]);
+  }, [entry?.status, entry?.paymentStatus]);
 
   // Clear active queue from storage and state
   const clearQueue = async () => {
@@ -76,10 +78,14 @@ export default function QueueTrackerScreen({ route, navigation }) {
       await updateQueueEntry(activeQueue.salonId, activeQueue.entryId, {
         status: "no-show",
       });
-    } catch (e) {
-      console.error("Failed to update queue entry:", e);
-    } finally {
       await clearQueue();
+    } catch (e) {
+      console.error("Failed to leave queue:", e);
+      if (Platform.OS === "web") {
+        window.alert("Could not leave queue. Please ask salon staff to remove you.");
+      } else {
+        Alert.alert("Error", "Could not leave queue. Please ask salon staff to remove you.");
+      }
     }
   };
 

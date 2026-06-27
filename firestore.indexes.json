@@ -16,6 +16,14 @@
         { "fieldPath": "paymentStatus", "order": "ASCENDING" },
         { "fieldPath": "completedAt",   "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "queue",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "customerId", "order": "ASCENDING" },
+        { "fieldPath": "status",     "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

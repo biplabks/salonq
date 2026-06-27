@@ -1,10 +1,12 @@
 // apps/customer/src/screens/SalonDetailScreen.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, SafeAreaView,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getSalon } from "../firebase";
 import { formatWait, isSalonOpen, formatPrice, DAYS, DAY_LABELS } from "../utils";
 import { useCurrentTime } from "../hooks/useCurrentTime";
@@ -32,13 +34,19 @@ function getSalonInitials(name = "") {
 export default function SalonDetailScreen({ route, navigation }) {
   const now      = useCurrentTime();
   const { salonId } = route.params;
-  const [salon,   setSalon]   = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [tab,     setTab]     = useState("services");
+  const [salon,       setSalon]       = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [tab,         setTab]         = useState("services");
+  const [hasActiveQ,  setHasActiveQ]  = useState(null); // null = checking
 
   useEffect(() => {
     getSalon(salonId).then((s) => { setSalon(s); setLoading(false); });
   }, [salonId]);
+
+  useFocusEffect(useCallback(() => {
+    setHasActiveQ(null);
+    AsyncStorage.getItem("activeQueue").then((val) => setHasActiveQ(!!val)).catch(() => {});
+  }, []));
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#1a1a2e" /></View>;
   if (!salon)  return <View style={s.center}><Text>Salon not found.</Text></View>;
@@ -104,12 +112,23 @@ export default function SalonDetailScreen({ route, navigation }) {
 
         {/* Join Queue CTA */}
         {open ? (
-          <TouchableOpacity style={s.cta} onPress={() => navigation.navigate("CheckIn", { salon })}>
-            <Text style={s.ctaText}>Join Queue →</Text>
-            {salon.queueCount !== undefined && (
-              <Text style={s.ctaSub}>{salon.queueCount} people ahead</Text>
-            )}
-          </TouchableOpacity>
+          hasActiveQ === null ? (
+            <View style={[s.cta, s.ctaDisabled]}>
+              <ActivityIndicator color="#fff" size="small" />
+            </View>
+          ) : hasActiveQ ? (
+            <View style={[s.cta, s.ctaDisabled]}>
+              <Text style={s.ctaText}>Already in a queue</Text>
+              <Text style={s.ctaSub}>Complete or leave your current queue first</Text>
+            </View>
+          ) : (
+            <TouchableOpacity style={s.cta} onPress={() => navigation.navigate("CheckIn", { salon })}>
+              <Text style={s.ctaText}>Join Queue →</Text>
+              {salon.queueCount !== undefined && (
+                <Text style={s.ctaSub}>{salon.queueCount} people ahead</Text>
+              )}
+            </TouchableOpacity>
+          )
         ) : (
           <View style={s.closedBanner}>
             <Text style={s.closedBannerText}>🕐 Salon is currently closed</Text>
@@ -215,6 +234,7 @@ const s = StyleSheet.create({
   ratingCount:      { fontSize: 13, color: "#6b7280" },
   ratingArrow:      { fontSize: 13, color: "#1a1a2e", fontWeight: "600" },
   cta:              { margin: 16, backgroundColor: "#1a1a2e", borderRadius: 16, paddingVertical: 18, alignItems: "center" },
+  ctaDisabled:      { backgroundColor: "#6b7280" },
   ctaText:          { color: "#fff", fontSize: 17, fontWeight: "800" },
   ctaSub:           { color: "#9ca3af", fontSize: 12, marginTop: 2 },
   closedBanner:     { margin: 16, backgroundColor: "#f3f4f6", borderRadius: 16, paddingVertical: 18, alignItems: "center" },

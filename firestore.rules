@@ -22,6 +22,11 @@ service cloud.firestore {
         get(/databases/$(database)/documents/salons/$(salonId)).data.ownerId == request.auth.uid;
     }
 
+    // Required for collectionGroup("queue") queries (e.g. duplicate-booking check)
+    match /{path=**}/queue/{entryId} {
+      allow read: if isAuth();
+    }
+
     match /salons/{salonId} {
       allow read: if true;
       allow create: if isAuth();
@@ -38,7 +43,10 @@ service cloud.firestore {
         allow update: if isSalonStaff(salonId) ||
           (isAuth() && resource.data.customerId == request.auth.uid &&
             !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(["status", "position", "stylistId"]));
+              .hasAny(["status", "position", "stylistId"])) ||
+          (isAuth() && resource.data.customerId == request.auth.uid &&
+            resource.data.status in ["waiting", "called"] &&
+            request.resource.data.status == "no-show");
         allow delete: if isSalonStaff(salonId);
       }
 
