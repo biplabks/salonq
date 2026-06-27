@@ -8,7 +8,10 @@
     "customer:build:web": "cd apps/customer && npx expo export --platform web",
     "salon": "cd apps/salon && npx expo start",
     "salon:web": "cd apps/salon && npx expo start --web",
-    "salon:build:web": "cd apps/salon && npx expo export --platform web"
+    "salon:build:web": "cd apps/salon && npx expo export --platform web",
+    "deploy:customer": "cd apps/customer && npm run build:web && cd ../.. && firebase deploy --only hosting:customer",
+    "deploy:salon": "cd apps/salon && npm run build:web && cd ../.. && firebase deploy --only hosting:salon",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes"
   },
   "dependencies": {
     "firebase-admin": "^13.9.0"

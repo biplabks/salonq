@@ -46,8 +46,8 @@ export default function SalonLogin() {
 
   useEffect(() => {
     if (response?.type === "success") {
-      const { id_token } = response.params;
-      const credential = GoogleAuthProvider.credential(id_token);
+      const { id_token, access_token } = response.params;
+      const credential = GoogleAuthProvider.credential(id_token ?? null, access_token ?? null);
       signInWithCredential(auth, credential)
         .catch((err) => showError("Sign-in failed", authErrorMessage(err.code)));
     }

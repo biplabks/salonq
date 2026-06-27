@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "salonq-5c956"
-  }
+  },
+  "targets": {
+    "salonq-5c956": {
+      "hosting": {
+        "customer": [
+          "salonq-5c956-customer"
+        ],
+        "salon": [
+          "salonq-5c956-salon"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

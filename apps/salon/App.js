@@ -1,7 +1,7 @@
 // apps/salon/App.js
 import "react-native-gesture-handler";
 import React, { useState, useEffect } from "react";
-import { Platform } from "react-native";
+import { Platform, ScrollView } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -20,7 +20,7 @@ import ReviewsScreen       from "./src/screens/ReviewsScreen";
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-export default function App() {
+function AppInner() {
   const [user,    setUser]    = useState(null);
   const [salon,   setSalon]   = useState(null);
   const [salonId, setSalonId] = useState(null);
@@ -36,10 +36,14 @@ export default function App() {
     return onAuthChange(async (u) => {
       setUser(u);
       if (u) {
-        const linkedSalon = await getStaffSalon(u.uid);
-        if (linkedSalon) {
-          setSalonId(linkedSalon.id);
-          setSalon(linkedSalon);
+        try {
+          const linkedSalon = await getStaffSalon(u.uid);
+          if (linkedSalon) {
+            setSalonId(linkedSalon.id);
+            setSalon(linkedSalon);
+          }
+        } catch (e) {
+          console.warn("getStaffSalon error:", e);
         }
       } else {
         setSalon(null);
@@ -120,6 +124,33 @@ export default function App() {
       </Tab.Navigator>
     </NavigationContainer>
   );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
+  );
+}
+
+class ErrorBoundary extends React.Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: "#1a1a2e" }} contentContainerStyle={{ padding: 24, paddingTop: 60 }}>
+        <Text style={{ color: "#ef4444", fontSize: 18, fontWeight: "700", marginBottom: 12 }}>Something went wrong</Text>
+        <Text style={{ color: "#fca5a5", fontSize: 13, fontFamily: "monospace" }}>
+          {this.state.error.toString()}
+        </Text>
+        <Text style={{ color: "#6b7280", fontSize: 12, marginTop: 16 }}>
+          {this.state.error.stack}
+        </Text>
+      </ScrollView>
+    );
+  }
 }
 
 const s = StyleSheet.create({
