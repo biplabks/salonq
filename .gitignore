@@ -3,6 +3,9 @@ node_modules/
 
 # Expo
 .expo/
+
+# Firebase CLI
+.firebase/
 dist/
 web-build/
 *.orig.*
