@@ -93,7 +93,8 @@ service cloud.firestore {
 
       match /visits/{visitId} {
         allow read:   if isOwner(userId);
-        allow create: if isOwner(userId);
+        allow create: if isOwner(userId) ||
+          (isAuth() && isSalonStaff(request.resource.data.salonId));
         allow update: if isOwner(userId);
         allow delete: if isOwner(userId);
       }

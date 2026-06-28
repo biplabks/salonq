@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, SafeAreaView, BackHandler, Platform,
+  ActivityIndicator, Alert, SafeAreaView, BackHandler, Platform, TextInput,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { getAuth } from "firebase/auth";
@@ -201,6 +201,9 @@ export default function CheckInScreen({ route, navigation }) {
   const [loading,              setLoading]              = useState(false);
   const [blockedByActiveQueue, setBlockedByActiveQueue] = useState(false);
   const [activeQueueSalonName, setActiveQueueSalonName] = useState("");
+  const [promoInput,           setPromoInput]           = useState("");
+  const [appliedPromo,         setAppliedPromo]         = useState(null);
+  const [promoError,           setPromoError]           = useState("");
 
   const user = getAuth().currentUser;
 
@@ -299,6 +302,39 @@ export default function CheckInScreen({ route, navigation }) {
   const activeStylists  = (salon.stylists || []).filter((s) => s.status === "available").length || 1;
   const estimatedWait   = calcEstimatedWait((salon.queueCount || 0) + 1, persons[0]?.services || [], activeStylists);
 
+  const discountAmount    = appliedPromo ? Math.round(totalPrice * appliedPromo.discountPercent / 100) : 0;
+  const totalAfterDiscount = totalPrice - discountAmount;
+
+  const applyPromo = () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    const promoCodes = salon.promoCodes || [];
+    const promo = promoCodes.find((p) => (p.code || "").toUpperCase() === code);
+    if (!promo) { setPromoError("Invalid promo code."); return; }
+    if (!promo.active) { setPromoError("This promo code is no longer active."); return; }
+    if (promo.expiryDate) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      if (new Date(promo.expiryDate) < today) { setPromoError("This promo code has expired."); return; }
+    }
+    if (promo.maxUses != null && (promo.usedCount || 0) >= promo.maxUses) {
+      setPromoError("This promo code has reached its usage limit."); return;
+    }
+    if (promo.onePerCustomer && user?.uid && (promo.usedBy || []).includes(user.uid)) {
+      setPromoError("You have already used this promo code."); return;
+    }
+    if (promo.minSpend && totalPrice < promo.minSpend) {
+      setPromoError(`Minimum spend of ${formatPrice(promo.minSpend)} required.`); return;
+    }
+    setAppliedPromo(promo);
+    setPromoError("");
+  };
+
+  const removePromo = () => {
+    setAppliedPromo(null);
+    setPromoInput("");
+    setPromoError("");
+  };
+
   const hasWhoStep   = familyMembers.length > 0;
   const totalSteps   = hasWhoStep ? 3 : 2;
   const servicesStep = hasWhoStep ? 2 : 1;
@@ -331,16 +367,19 @@ export default function CheckInScreen({ route, navigation }) {
       const customerName = persons.map((p) => p.name).join(", ");
 
       const entryRef = await joinQueue({
-        salonId:        salon.id,
-        customerId:     user?.uid ?? null,
+        salonId:            salon.id,
+        customerId:         user?.uid ?? null,
         customerName,
-        services:       persons[0]?.services || [],
-        stylistId:      persons[0]?.stylistId   || null,
-        stylistName:    persons[0]?.stylistName || null,
+        services:           persons[0]?.services || [],
+        stylistId:          persons[0]?.stylistId   || null,
+        stylistName:        persons[0]?.stylistName || null,
         groupMembers,
-        isGroupBooking: persons.length > 1,
-        peopleCount:    persons.length,
+        isGroupBooking:     persons.length > 1,
+        peopleCount:        persons.length,
         totalPrice,
+        promoCode:          appliedPromo?.code || null,
+        discountPercent:    appliedPromo?.discountPercent || 0,
+        totalAfterDiscount: totalAfterDiscount,
       });
 
       await AsyncStorage.setItem("activeQueue", JSON.stringify({
@@ -540,12 +579,67 @@ export default function CheckInScreen({ route, navigation }) {
               <Text style={s.confirmValue}>~{totalDuration} min</Text>
             </View>
             <View style={s.divider} />
+            {appliedPromo && (
+              <View style={s.confirmRow}>
+                <Text style={s.confirmLabel}>Subtotal</Text>
+                <Text style={s.confirmValue}>{formatPrice(totalPrice)}</Text>
+              </View>
+            )}
+            {appliedPromo && (
+              <View style={s.confirmRow}>
+                <Text style={[s.confirmLabel, { color: "#16a34a" }]}>
+                  Discount ({appliedPromo.discountPercent}%)
+                </Text>
+                <Text style={[s.confirmValue, { color: "#16a34a", fontWeight: "700" }]}>
+                  -{formatPrice(discountAmount)}
+                </Text>
+              </View>
+            )}
             <View style={s.confirmRow}>
               <Text style={[s.confirmLabel, { fontSize: 16, fontWeight: "800", color: "#1a1a2e" }]}>Total</Text>
               <Text style={[s.confirmValue, { fontSize: 18, fontWeight: "900", color: "#1a1a2e" }]}>
-                {formatPrice(totalPrice)}
+                {formatPrice(totalAfterDiscount)}
               </Text>
             </View>
+          </View>
+
+          {/* Promo code */}
+          <View style={s.promoSection}>
+            <Text style={s.promoHeading}>🏷️ Promo code</Text>
+            {appliedPromo ? (
+              <View style={s.promoApplied}>
+                <Text style={s.promoAppliedText}>
+                  ✅ {appliedPromo.code} — {appliedPromo.discountPercent}% off
+                  {appliedPromo.description ? `  ·  ${appliedPromo.description}` : ""}
+                </Text>
+                <TouchableOpacity onPress={removePromo}>
+                  <Text style={s.promoRemove}>✕ Remove</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <View style={s.promoRow}>
+                  <TextInput
+                    style={s.promoInput}
+                    value={promoInput}
+                    onChangeText={(v) => { setPromoInput(v); setPromoError(""); }}
+                    placeholder="Enter code"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    onSubmitEditing={applyPromo}
+                  />
+                  <TouchableOpacity
+                    style={[s.promoApplyBtn, !promoInput.trim() && { opacity: 0.4 }]}
+                    onPress={applyPromo}
+                    disabled={!promoInput.trim()}
+                  >
+                    <Text style={s.promoApplyText}>Apply</Text>
+                  </TouchableOpacity>
+                </View>
+                {promoError ? <Text style={s.promoError}>{promoError}</Text> : null}
+              </>
+            )}
           </View>
 
           <View style={s.notifNote}>
@@ -633,6 +727,16 @@ const s = StyleSheet.create({
   divider:             { height: 1, backgroundColor: "#f3f4f6", marginVertical: 4 },
   notifNote:           { backgroundColor: "#eff6ff", borderRadius: 12, padding: 14, marginTop: 12 },
   notifNoteText:       { fontSize: 13, color: "#1d4ed8", lineHeight: 18 },
+  promoSection:        { backgroundColor: "#fff", borderRadius: 16, padding: 16, marginTop: 12, borderWidth: 1, borderColor: "#e5e7eb" },
+  promoHeading:        { fontSize: 14, fontWeight: "700", color: "#1a1a2e", marginBottom: 10 },
+  promoRow:            { flexDirection: "row", gap: 8 },
+  promoInput:          { flex: 1, backgroundColor: "#f3f4f6", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: "#1a1a2e", letterSpacing: 1 },
+  promoApplyBtn:       { backgroundColor: "#1a1a2e", borderRadius: 10, paddingHorizontal: 18, justifyContent: "center" },
+  promoApplyText:      { color: "#fff", fontWeight: "700", fontSize: 14 },
+  promoError:          { fontSize: 12, color: "#ef4444", marginTop: 8 },
+  promoApplied:        { flexDirection: "row", alignItems: "center", backgroundColor: "#dcfce7", borderRadius: 10, padding: 12, gap: 8 },
+  promoAppliedText:    { flex: 1, fontSize: 13, color: "#16a34a", fontWeight: "600" },
+  promoRemove:         { fontSize: 12, color: "#6b7280", fontWeight: "600" },
   footer:              { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#f3f4f6", padding: 16 },
   footerMeta:          { textAlign: "center", color: "#6b7280", fontSize: 13, marginBottom: 8 },
   nextBtn:             { backgroundColor: "#1a1a2e", borderRadius: 14, paddingVertical: 16, alignItems: "center" },

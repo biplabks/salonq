@@ -2,13 +2,14 @@
 // Shown when a staff member logs in but has no salon linked yet.
 // They can either register a new salon or enter an existing salon ID.
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, ScrollView, SafeAreaView, Platform,
 } from "react-native";
 import { getAuth } from "firebase/auth";
-import { createSalon, linkStaffToSalon, getSalon } from "../firebase";
+import { createSalon, linkStaffToSalon, getSalon, firestore, logout } from "../firebase";
+import { getDoc, doc } from "firebase/firestore";
 import LocationPickerWeb from "../components/LocationPickerWeb";
 
 const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
@@ -20,8 +21,10 @@ const DEFAULT_HOURS = DAYS.reduce((acc, d) => ({
 }), {});
 
 export default function SalonRegisterScreen({ onSalonCreated }) {
-  const [tab,      setTab]      = useState("new"); // "new" | "existing"
-  const [loading,  setLoading]  = useState(false);
+  const [tab,         setTab]         = useState("new"); // "new" | "existing"
+  const [loading,     setLoading]     = useState(false);
+  const [inviteInput, setInviteInput] = useState("");
+  const [requiredCode, setRequiredCode] = useState(null); // null = not loaded yet
 
   // New salon fields
   const [name,     setName]     = useState("");
@@ -37,7 +40,18 @@ export default function SalonRegisterScreen({ onSalonCreated }) {
 
   const user = getAuth().currentUser;
 
+  useEffect(() => {
+    getDoc(doc(firestore, "config", "invite"))
+      .then((snap) => setRequiredCode(snap.exists() ? (snap.data().code ?? "") : ""))
+      .catch(() => setRequiredCode(""));
+  }, []);
+
   const handleCreateSalon = async () => {
+    if (requiredCode && inviteInput.trim() !== requiredCode) {
+      if (Platform.OS === "web") window.alert("Invalid invite code. Please check and try again.");
+      else Alert.alert("Invalid invite code", "Please check and try again.");
+      return;
+    }
     if (!name || !address || !city) {
       if (Platform.OS === "web") window.alert("Please fill in salon name, address and city.");
       else Alert.alert("Missing fields", "Please fill in salon name, address and city.");
@@ -120,6 +134,10 @@ export default function SalonRegisterScreen({ onSalonCreated }) {
   return (
     <SafeAreaView style={s.container}>
       <ScrollView contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity style={s.signOutBtn} onPress={logout}>
+          <Text style={s.signOutText}>Sign out</Text>
+        </TouchableOpacity>
+
         <Text style={s.logo}>✂️</Text>
         <Text style={s.title}>Set up your salon</Text>
         <Text style={s.sub}>Register a new salon or join an existing one</Text>
@@ -143,6 +161,16 @@ export default function SalonRegisterScreen({ onSalonCreated }) {
         {/* New salon form */}
         {tab === "new" && (
           <View>
+            <Text style={s.label}>Invite Code *</Text>
+            <TextInput
+              style={s.input}
+              placeholder="Enter your invite code"
+              value={inviteInput}
+              onChangeText={setInviteInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
             <Text style={s.label}>Salon name *</Text>
             <TextInput style={s.input} placeholder="e.g. Style Studio" value={name} onChangeText={setName} />
 
@@ -253,4 +281,6 @@ const s = StyleSheet.create({
   previewName:     { fontSize: 15, fontWeight: "700", color: "#fff" },
   previewAddr:     { fontSize: 12, color: "#9ca3af", marginTop: 2 },
   previewCheck:    { fontSize: 20, color: "#16a34a" },
+  signOutBtn:      { alignSelf: "flex-end" },
+  signOutText:     { fontSize: 13, color: "#6b7280", fontWeight: "600" },
 });

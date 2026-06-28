@@ -56,6 +56,7 @@ export const joinQueue = async ({
   stylistId = null, stylistName = null,
   groupMembers = [], isGroupBooking = false,
   peopleCount = 1, totalPrice = null,
+  promoCode = null, discountPercent = 0, totalAfterDiscount = null,
 }) => {
   const queueRef      = collection(db, "salons", salonId, "queue");
   const totalDuration = services.reduce((s, sv) => s + (sv.durationMin || 30), 0);
@@ -89,24 +90,29 @@ export const joinQueue = async ({
       .catch(() => {});
   }
 
+  const basePrice = totalPrice ?? services.reduce((s, sv) => s + (sv.price || 0), 0) * peopleCount;
+
   const newEntryRef = await addDoc(queueRef, {
     customerId,
     customerName,
     services,
     stylistId,
-    stylistName:      stylistName || null,
+    stylistName:        stylistName || null,
     groupMembers,
     isGroupBooking,
     peopleCount,
-    status:           "waiting",
-    type:             "online",
-    totalPrice:       totalPrice ?? services.reduce((s, sv) => s + (sv.price || 0), 0) * peopleCount,
+    status:             "waiting",
+    type:               "online",
+    totalPrice:         basePrice,
+    promoCode:          promoCode || null,
+    discountPercent:    discountPercent || 0,
+    totalAfterDiscount: totalAfterDiscount ?? basePrice,
     position,
     estimatedWaitMin,
-    paymentStatus:    "pending",
-    joinedAt:         serverTimestamp(),
-    calledAt:         null,
-    completedAt:      null,
+    paymentStatus:      "pending",
+    joinedAt:           serverTimestamp(),
+    calledAt:           null,
+    completedAt:        null,
   });
 
   return newEntryRef;
