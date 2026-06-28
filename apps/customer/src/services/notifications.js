@@ -7,6 +7,10 @@ import { Platform } from "react-native";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
+// Key used to store the scheduled reminder notification ID in AsyncStorage.
+export const REMINDER_NOTIF_KEY  = "reminderNotifId";
+export const REMINDER_ENABLED_KEY = "reminderEnabled";
+
 /**
  * Request permission and get the Expo push token.
  * Returns the token string or null if permission denied.
@@ -87,4 +91,46 @@ export const setupNotificationListeners = (onReceive, onTap) => {
     receiveListener.remove();
     tapListener.remove();
   };
+};
+
+/**
+ * Schedule a local "heads-up" reminder firing (estimatedWaitMin - 10) minutes from now.
+ * Returns the notification ID, or null if not applicable.
+ */
+export const scheduleReminderNotification = async (estimatedWaitMin) => {
+  if (Platform.OS === "web") return null;
+  if (!Device.isDevice) return null;
+  if (!estimatedWaitMin || estimatedWaitMin <= 10) return null;
+
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== "granted") return null;
+
+  try {
+    const delaySec = (estimatedWaitMin - 10) * 60;
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "⏰ Time to head over!",
+        body:  "Your turn is coming up in about 10 minutes. Start making your way to the salon.",
+        sound: true,
+        channelId: "salonq",
+      },
+      trigger: { seconds: delaySec },
+    });
+    return id;
+  } catch (err) {
+    console.warn("Failed to schedule reminder:", err);
+    return null;
+  }
+};
+
+/**
+ * Cancel a previously scheduled reminder by its notification ID.
+ */
+export const cancelReminderNotification = async (notifId) => {
+  if (!notifId) return;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(notifId);
+  } catch (err) {
+    console.warn("Could not cancel reminder:", err);
+  }
 };

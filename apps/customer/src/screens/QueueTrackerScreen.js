@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQueueEntry } from "../hooks/useQueue";
 import { updateQueueEntry } from "../firebase";
 import { formatWait, formatTime, STATUS_LABELS, STATUS_COLORS } from "../utils";
+import { cancelReminderNotification, REMINDER_NOTIF_KEY } from "../services/notifications";
 
 export default function QueueTrackerScreen({ route, navigation }) {
   const [activeQueue,   setActiveQueue]   = useState(null);
@@ -54,6 +55,16 @@ export default function QueueTrackerScreen({ route, navigation }) {
 
   const { entry, loading } = useQueueEntry(activeQueue?.salonId, activeQueue?.entryId);
 
+  const cancelReminder = async () => {
+    try {
+      const id = await AsyncStorage.getItem(REMINDER_NOTIF_KEY);
+      if (id) {
+        await cancelReminderNotification(id);
+        await AsyncStorage.removeItem(REMINDER_NOTIF_KEY);
+      }
+    } catch {}
+  };
+
   // Live countdown: tick every minute based on elapsed time since joining
   useEffect(() => {
     if (!entry?.estimatedWaitMin || !entry?.joinedAt) return;
@@ -80,8 +91,16 @@ export default function QueueTrackerScreen({ route, navigation }) {
     }
   }, [entry?.status, entry?.paymentStatus]);
 
+  // Cancel the 10-min reminder once the customer is actually called — no point firing it then
+  useEffect(() => {
+    if (entry?.status === "called" || entry?.status === "in-service") {
+      cancelReminder();
+    }
+  }, [entry?.status]);
+
   // Clear active queue from storage and state
   const clearQueue = async () => {
+    cancelReminder();
     try {
       await AsyncStorage.removeItem("activeQueue");
     } catch (e) {

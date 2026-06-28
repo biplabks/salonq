@@ -354,11 +354,14 @@ export default function QueueDashboard({ salonId, salon }) {
   const [stylistPicker, setStylistPicker] = useState(null);
   const [groupPicker,   setGroupPicker]   = useState(null);
   const [paymentEntry,  setPaymentEntry]  = useState(null);
-  const prevQueueLen = useRef(null);
+  const prevQueueLen       = useRef(null);
+  const prevWaitingCount   = useRef(null);
+  const availableStylistsRef = useRef(1);
 
   const availableStylists = (salon?.stylists || []).filter(
     (s) => s.status === "available" || s.status === "busy"
   ).length || 1;
+  availableStylistsRef.current = availableStylists;
 
   useEffect(() => {
     if (!salonId) return;
@@ -366,6 +369,14 @@ export default function QueueDashboard({ salonId, salon }) {
       const prevQueue = queue;
       setQueue(entries);
       setLoading(false);
+
+      // When new waiting entries appear (customer joined remotely), sync queueCount on salon doc
+      const waitingCount = entries.filter((e) => e.status === "waiting").length;
+      if (prevWaitingCount.current !== null && waitingCount > prevWaitingCount.current) {
+        recalculateQueue(salonId, availableStylistsRef.current).catch(() => {});
+      }
+      prevWaitingCount.current = waitingCount;
+
       if (prevQueue.length > 0) {
         const changes = entries.filter((e) => {
           const prev = prevQueue.find((p) => p.id === e.id);

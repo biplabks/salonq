@@ -11,11 +11,12 @@ import CheckInScreen        from "../screens/CheckInScreen";
 import QueueTrackerScreen   from "../screens/QueueTrackerScreen";
 import ProfileScreen        from "../screens/ProfileScreen";
 import LoginScreen          from "../screens/LoginScreen";
-import HistoryScreen        from "../screens/HistoryScreen";
-import ReceiptScreen        from "../screens/ReceiptScreen";
-import FamilyMembersScreen  from "../screens/FamilyMembersScreen";
-import ReviewScreen         from "../screens/ReviewScreen";
-import ReviewsScreen        from "../screens/ReviewsScreen";
+import HistoryScreen                from "../screens/HistoryScreen";
+import ReceiptScreen               from "../screens/ReceiptScreen";
+import FamilyMembersScreen         from "../screens/FamilyMembersScreen";
+import ReviewScreen                from "../screens/ReviewScreen";
+import ReviewsScreen               from "../screens/ReviewsScreen";
+import NotificationSettingsScreen  from "../screens/NotificationSettingsScreen";
 import { useAuth }          from "../hooks/useAuth";
 
 const Stack = createNativeStackNavigator();
@@ -35,9 +36,10 @@ function ExploreStack() {
 function ProfileStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="ProfileMain"   component={ProfileScreen} />
-      <Stack.Screen name="History"       component={HistoryScreen} />
-      <Stack.Screen name="FamilyMembers" component={FamilyMembersScreen} />
+      <Stack.Screen name="ProfileMain"           component={ProfileScreen} />
+      <Stack.Screen name="History"               component={HistoryScreen} />
+      <Stack.Screen name="FamilyMembers"         component={FamilyMembersScreen} />
+      <Stack.Screen name="NotificationSettings"  component={NotificationSettingsScreen} />
     </Stack.Navigator>
   );
 }

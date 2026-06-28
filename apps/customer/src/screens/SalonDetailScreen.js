@@ -8,7 +8,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getSalon, db } from "../firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { formatWait, isSalonOpen, formatPrice, DAYS, DAY_LABELS } from "../utils";
 import { useCurrentTime } from "../hooks/useCurrentTime";
 
@@ -44,6 +44,15 @@ export default function SalonDetailScreen({ route, navigation }) {
 
   useEffect(() => {
     getSalon(salonId).then((s) => { setSalon(s); setLoading(false); });
+
+    // salon.queueCount is a cached value updated only by the salon app.
+    // Fetch the live waiting count directly so it's always accurate.
+    getDocs(query(
+      collection(db, "salons", salonId, "queue"),
+      where("status", "==", "waiting")
+    )).then((snap) => {
+      setSalon((prev) => prev ? { ...prev, queueCount: snap.size } : prev);
+    }).catch(() => {});
   }, [salonId]);
 
   // Fetch live review stats from subcollection — salon document value can be stale

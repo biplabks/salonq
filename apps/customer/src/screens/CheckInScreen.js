@@ -11,6 +11,11 @@ import { getAuth } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { joinQueue, getCustomer } from "../firebase";
 import { formatPrice, formatWait, calcEstimatedWait } from "../utils";
+import {
+  scheduleReminderNotification,
+  REMINDER_ENABLED_KEY,
+  REMINDER_NOTIF_KEY,
+} from "../services/notifications";
 
 const showError = (title, msg) => {
   if (Platform.OS === "web") window.alert(msg || title);
@@ -385,6 +390,16 @@ export default function CheckInScreen({ route, navigation }) {
       await AsyncStorage.setItem("activeQueue", JSON.stringify({
         salonId: salon.id, entryId: entryRef.id, salonName: salon.name,
       }));
+
+      // Schedule the 10-minute heads-up reminder if the user has it enabled
+      try {
+        const reminderPref = await AsyncStorage.getItem(REMINDER_ENABLED_KEY);
+        const wantsReminder = reminderPref === null ? true : reminderPref === "true";
+        if (wantsReminder) {
+          const notifId = await scheduleReminderNotification(estimatedWait);
+          if (notifId) await AsyncStorage.setItem(REMINDER_NOTIF_KEY, notifId);
+        }
+      } catch {}
 
       navigation.reset({
         index: 0,

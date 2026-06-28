@@ -84,7 +84,7 @@ export default function ProfileScreen({ navigation }) {
         <MenuItem
           emoji="🔔"
           label="Notification settings"
-          onPress={() => handleComingSoon("Notification settings")}
+          onPress={() => navigation.navigate("NotificationSettings")}
           last={true}
         />
       </View>
