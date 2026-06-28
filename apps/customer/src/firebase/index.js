@@ -78,11 +78,14 @@ export const joinQueue = async ({
     }
   }
 
-  // Count current waiting entries for position (no composite index needed)
-  const countSnap = await getCountFromServer(
+  // Fetch waiting entries to compute position AND cumulative wait time ahead
+  const waitingSnap = await getDocs(
     query(queueRef, where("status", "==", "waiting"))
   );
-  const position = countSnap.data().count + 1;
+  const position = waitingSnap.size + 1;
+  const estimatedWaitMin = waitingSnap.docs
+    .map((d) => d.data())
+    .reduce((sum, e) => sum + (e.services || []).reduce((s, sv) => s + (sv.durationMin || 30), 0), 0);
 
   const newEntryRef = await addDoc(queueRef, {
     customerId,
@@ -97,7 +100,7 @@ export const joinQueue = async ({
     type:             "online",
     totalPrice:       totalPrice ?? services.reduce((s, sv) => s + (sv.price || 0), 0) * peopleCount,
     position,
-    estimatedWaitMin: (position - 1) * totalDuration,
+    estimatedWaitMin,
     paymentStatus:    "pending",
     joinedAt:         serverTimestamp(),
     calledAt:         null,

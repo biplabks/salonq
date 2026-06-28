@@ -10,8 +10,9 @@ import { updateQueueEntry } from "../firebase";
 import { formatWait, formatTime, STATUS_LABELS, STATUS_COLORS } from "../utils";
 
 export default function QueueTrackerScreen({ route, navigation }) {
-  const [activeQueue, setActiveQueue] = useState(null);
-  const [loaded, setLoaded] = useState(false);
+  const [activeQueue,   setActiveQueue]   = useState(null);
+  const [loaded,        setLoaded]        = useState(false);
+  const [remainingMin,  setRemainingMin]  = useState(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Load active queue from params or AsyncStorage
@@ -52,6 +53,23 @@ export default function QueueTrackerScreen({ route, navigation }) {
   }, []);
 
   const { entry, loading } = useQueueEntry(activeQueue?.salonId, activeQueue?.entryId);
+
+  // Live countdown: tick every minute based on elapsed time since joining
+  useEffect(() => {
+    if (!entry?.estimatedWaitMin || !entry?.joinedAt) return;
+
+    const calc = () => {
+      const joinedMs   = entry.joinedAt?.toDate
+        ? entry.joinedAt.toDate().getTime()
+        : new Date(entry.joinedAt).getTime();
+      const elapsedMin = Math.floor((Date.now() - joinedMs) / 60000);
+      setRemainingMin(Math.max(0, entry.estimatedWaitMin - elapsedMin));
+    };
+
+    calc();
+    const interval = setInterval(calc, 60000);
+    return () => clearInterval(interval);
+  }, [entry?.estimatedWaitMin, entry?.joinedAt]);
 
   // Clear AsyncStorage only when fully complete: paid+done OR no-show
   useEffect(() => {
@@ -195,9 +213,15 @@ export default function QueueTrackerScreen({ route, navigation }) {
             <>
               <Text style={s.posLabel}>Position</Text>
               <Text style={s.posNum}>#{entry.position}</Text>
-              <Text style={s.waitLabel}>Estimated wait</Text>
+              <Text style={s.waitLabel}>
+                {remainingMin === 0 ? "Be ready!" : "Time remaining"}
+              </Text>
               <Text style={[s.waitTime, { color: statusColor }]}>
-                {formatWait(entry.estimatedWaitMin)}
+                {remainingMin === 0
+                  ? "Any moment now 🔔"
+                  : remainingMin !== null
+                    ? formatWait(remainingMin)
+                    : formatWait(entry.estimatedWaitMin)}
               </Text>
             </>
           )

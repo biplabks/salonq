@@ -27,21 +27,22 @@ export const recalculateQueue = async (salonId, availableStylists = 1) => {
   const waiting     = entries.filter((e) => e.status === "waiting");
 
   const batch = writeBatch(firestore);
+  const effectiveStylists = Math.max(availableStylists - beingServed.length, 1);
 
-  // Only renumber WAITING customers
+  // Cumulative wait: each customer waits behind the sum of durations ahead of them
+  let cumulativeMin = 0;
   waiting.forEach((entry, index) => {
-    const newPosition       = index + 1;
-    const avgDuration       = entry.services?.length
-      ? entry.services.reduce((s, sv) => s + (sv.durationMin || 30), 0) / entry.services.length
-      : 30;
-    const effectiveStylists = Math.max(availableStylists - beingServed.length, 1);
-    const newWait           = Math.round(((newPosition - 1) * avgDuration) / effectiveStylists);
+    const newPosition = index + 1;
+    const serviceDur  = (entry.services || []).reduce((s, sv) => s + (sv.durationMin || 30), 0) || 30;
+    const newWait     = Math.round(cumulativeMin / effectiveStylists);
 
     batch.update(doc(firestore, "salons", salonId, "queue", entry.id), {
       position:         newPosition,
       estimatedWaitMin: newWait,
       updatedAt:        serverTimestamp(),
     });
+
+    cumulativeMin += serviceDur;
   });
 
   await batch.commit();

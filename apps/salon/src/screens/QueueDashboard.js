@@ -11,7 +11,7 @@ import {
   saveSalon, getSalon,
   serverTimestamp, addDoc, collection, firestore,
 } from "../firebase";
-import { getDocs, query, where, orderBy, onSnapshot, doc, updateDoc, getCountFromServer } from "firebase/firestore";
+import { getDocs, query, where, orderBy, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { recalculateQueue } from "../utils/waitTimeEngine";
 import { crossAlert } from "../utils/crossAlert";
 import {
@@ -278,17 +278,18 @@ function WalkInModal({ visible, onClose, salon, salonId }) {
     }
     setLoading(true);
     try {
-      const queueRef   = collection(firestore, "salons", salonId, "queue");
-      const countSnap  = await getCountFromServer(
-        query(queueRef, where("status", "in", ["waiting", "called", "in-service"]))
-      );
-      const nextPosition  = countSnap.data().count + 1;
+      const queueRef      = collection(firestore, "salons", salonId, "queue");
+      const waitingSnap   = await getDocs(query(queueRef, where("status", "==", "waiting")));
+      const nextPosition  = waitingSnap.size + 1;
       const totalDuration = selected.reduce((s, sv) => s + (sv.durationMin || 30), 0);
       const totalPrice    = selected.reduce((s, sv) => s + (sv.price || 0), 0);
+      const estimatedWaitMin = waitingSnap.docs
+        .map((d) => d.data())
+        .reduce((sum, e) => sum + (e.services || []).reduce((s, sv) => s + (sv.durationMin || 30), 0), 0);
       await addDoc(queueRef, {
         customerId: null, customerName: name, services: selected,
         stylistId: null, status: "waiting", type: "walk-in",
-        position: nextPosition, estimatedWaitMin: (nextPosition - 1) * totalDuration,
+        position: nextPosition, estimatedWaitMin,
         totalPrice, paymentStatus: "pending", isGroupBooking: false, peopleCount: 1,
         joinedAt: serverTimestamp(), calledAt: null, completedAt: null,
       });
@@ -488,7 +489,7 @@ export default function QueueDashboard({ salonId, salon }) {
           }
           break;
 
-        case "done":
+        case "done": {
           await completeService(salonId, entry.id, entry.stylistId);
           await updateQueueEntry(salonId, entry.id, { paymentStatus: "pending" });
           if (salon?.stylists) {
@@ -501,8 +502,24 @@ export default function QueueDashboard({ salonId, salon }) {
             await saveSalon(salonId, { stylists: updated });
           }
           await recalculateQueue(salonId, availableStylists);
+
+          // Alert next waiting customer early if their updated wait is <= 5 min
+          const nextCustomer = queue
+            .filter((e) => e.status === "waiting")
+            .sort((a, b) => a.position - b.position)[0];
+          if (nextCustomer?.pushToken && (nextCustomer?.estimatedWaitMin ?? 99) <= 5) {
+            const notif = NOTIFICATIONS.readyEarly(salon?.name || "the salon");
+            await sendPushNotification(
+              nextCustomer.pushToken,
+              notif.title,
+              notif.body,
+              { salonId, entryId: nextCustomer.id }
+            );
+          }
+
           setPaymentEntry({ ...entry, status: "done", paymentStatus: "pending" });
           break;
+        }
 
         case "no-show":
           crossAlert(
@@ -637,6 +654,20 @@ export default function QueueDashboard({ salonId, salon }) {
                   {item.status === "waiting" && (
                     <TouchableOpacity style={[s.actionBtn, { backgroundColor: "#1a1a2e" }]} onPress={() => handleAction("call", item)}>
                       <Text style={s.actionBtnText}>Call →</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.status === "waiting" && item.pushToken && (
+                    <TouchableOpacity
+                      style={[s.actionBtn, { backgroundColor: "#f59e0b" }]}
+                      onPress={async () => {
+                        const notif = NOTIFICATIONS.readyEarly(salon?.name || "the salon");
+                        await sendPushNotification(item.pushToken, notif.title, notif.body, {
+                          salonId, entryId: item.id,
+                        });
+                        crossAlert("Alerted", `${item.customerName} has been notified to head over.`);
+                      }}
+                    >
+                      <Text style={s.actionBtnText}>⚡ Alert</Text>
                     </TouchableOpacity>
                   )}
                   {item.status === "called" && (

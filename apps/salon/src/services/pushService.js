@@ -111,4 +111,9 @@ export const NOTIFICATIONS = {
     title: "🎉 Queue is clear!",
     body:  `${salonName} is ready to serve you right now.`,
   }),
+
+  readyEarly: (salonName) => ({
+    title: "⚡ We're ready early!",
+    body:  `${salonName} is ready sooner than expected — head over now if you can!`,
+  }),
 };
