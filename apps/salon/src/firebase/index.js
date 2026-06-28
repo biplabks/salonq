@@ -5,7 +5,7 @@ import {
 } from "firebase/auth";
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc,
-  updateDoc, addDoc, query, where, orderBy, onSnapshot, serverTimestamp,
+  updateDoc, addDoc, deleteDoc, query, where, orderBy, onSnapshot, serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
 
@@ -39,11 +39,11 @@ export const getStaffSalon = async (uid) => {
 };
 
 /** Link a staff member to a salon */
-export const linkStaffToSalon = (uid, salonId, email) =>
+export const linkStaffToSalon = (uid, salonId, email, role = "staff") =>
   setDoc(doc(firestore, "salonStaff", uid), {
     salonId,
     email,
-    role:      "owner",
+    role,
     createdAt: serverTimestamp(),
   });
 
@@ -60,14 +60,27 @@ export const saveSalon = (salonId, data) =>
 export const createSalon = async (uid, email, salonData) => {
   const salonRef = await addDoc(collection(firestore, "salons"), {
     ...salonData,
+    ownerId:    uid,
     queueCount: 0,
     avgWaitMin:  0,
     createdAt:  serverTimestamp(),
     updatedAt:  serverTimestamp(),
   });
-  await linkStaffToSalon(uid, salonRef.id, email);
+  await linkStaffToSalon(uid, salonRef.id, email, "owner");
   return salonRef.id;
 };
+
+/** Return all staff members linked to a salon */
+export const getStaffList = async (salonId) => {
+  const snap = await getDocs(
+    query(collection(firestore, "salonStaff"), where("salonId", "==", salonId))
+  );
+  return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+};
+
+/** Remove a staff member by deleting their salonStaff document */
+export const removeStaffMember = (uid) =>
+  deleteDoc(doc(firestore, "salonStaff", uid));
 
 // ── Queue ─────────────────────────────────────────────────────────────────────
 export const subscribeToQueue = (salonId, callback) => {
@@ -107,4 +120,4 @@ export const completeService = async (salonId, entryId, stylistId) => {
 };
 
 // ── Re-exports ────────────────────────────────────────────────────────────────
-export { serverTimestamp, addDoc, collection, doc, onSnapshot, getDocs, query, where, orderBy, writeBatch };
+export { serverTimestamp, addDoc, collection, doc, onSnapshot, getDocs, query, where, orderBy, writeBatch, deleteDoc };

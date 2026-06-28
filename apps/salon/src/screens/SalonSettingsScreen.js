@@ -11,9 +11,10 @@ import ManageStylistsScreen   from "./ManageStylistsScreen";
 import ManageServicesScreen   from "./ManageServicesScreen";
 import ManageHoursScreen      from "./ManageHoursScreen";
 import ManagePromoCodesScreen from "./ManagePromoCodesScreen";
+import ManageStaffScreen      from "./ManageStaffScreen";
 
 export default function SalonSettingsScreen({ salon, salonId }) {
-  const [screen, setScreen] = useState("main"); // "main" | "stylists" | "services" | "hours" | "promos"
+  const [screen, setScreen] = useState("main"); // "main" | "stylists" | "services" | "hours" | "promos" | "staff"
   const user = getAuth().currentUser;
 
   const handleSignOut = () => {
@@ -46,6 +47,9 @@ export default function SalonSettingsScreen({ salon, salonId }) {
   }
   if (screen === "promos") {
     return <ManagePromoCodesScreen salon={salon} salonId={salonId} onBack={() => setScreen("main")} />;
+  }
+  if (screen === "staff") {
+    return <ManageStaffScreen salon={salon} salonId={salonId} onBack={() => setScreen("main")} />;
   }
 
   return (
@@ -96,7 +100,7 @@ export default function SalonSettingsScreen({ salon, salonId }) {
         <MenuItem
           emoji="👥"
           label="Manage staff"
-          onPress={() => crossAlertInfo("Coming soon 🚀", "Staff management coming in the next update!")}
+          onPress={() => setScreen("staff")}
           last
         />
       </View>
