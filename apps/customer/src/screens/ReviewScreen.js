@@ -7,7 +7,7 @@ import {
   TouchableOpacity, TextInput, ActivityIndicator, Alert,
 } from "react-native";
 import {
-  collection, addDoc, doc, updateDoc, serverTimestamp,
+  collection, addDoc, doc, updateDoc, getDocs, serverTimestamp,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
@@ -66,6 +66,18 @@ export default function ReviewScreen({ route, navigation }) {
       });
 
       await updateDoc(doc(db, "salons", salonId, "queue", entryId), { reviewed: true });
+
+      // Fire-and-forget: update salon stats — must not block setSubmitted
+      getDocs(collection(db, "salons", salonId, "reviews"))
+        .then((allSnap) => {
+          const all          = allSnap.docs.map((d) => d.data());
+          const totalRatings = all.length;
+          const avgRating    = totalRatings > 0
+            ? Math.round((all.reduce((s, r) => s + (r.salonRating || 0), 0) / totalRatings) * 10) / 10
+            : 0;
+          return updateDoc(doc(db, "salons", salonId), { avgRating, totalRatings, updatedAt: serverTimestamp() });
+        })
+        .catch((err) => console.warn("Salon stats update skipped:", err.message));
 
       setSubmitted(true);
     } catch (err) {

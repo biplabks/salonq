@@ -37,9 +37,12 @@ export default function ReviewsScreen({ route, navigation }) {
     return d.toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
   };
 
-  const displayAvg = avgRating || (reviews.length
-    ? (reviews.reduce((s, r) => s + r.salonRating, 0) / reviews.length).toFixed(1)
-    : "—");
+  // Always compute from live reviews — salon document value can be stale
+  const liveCount  = reviews.length;
+  const liveAvgNum = liveCount > 0
+    ? reviews.reduce((s, r) => s + r.salonRating, 0) / liveCount
+    : (avgRating || 0);
+  const displayAvg = liveCount > 0 ? liveAvgNum.toFixed(1) : (avgRating?.toFixed?.(1) || "—");
 
   if (loading) return <View style={s.center}><ActivityIndicator color="#1a1a2e" size="large" /></View>;
 
@@ -55,8 +58,8 @@ export default function ReviewsScreen({ route, navigation }) {
 
       <View style={s.ratingSummary}>
         <Text style={s.ratingBig}>{displayAvg}</Text>
-        <StarDisplay rating={Math.round(avgRating || 0)} size={20} />
-        <Text style={s.ratingCount}>{totalRatings || reviews.length} reviews</Text>
+        <StarDisplay rating={Math.round(liveAvgNum)} size={20} />
+        <Text style={s.ratingCount}>{liveCount} reviews</Text>
       </View>
 
       <FlatList

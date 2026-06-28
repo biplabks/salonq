@@ -1,8 +1,7 @@
 // apps/salon/src/firebase/index.js
 import { initializeApp, getApps } from "firebase/app";
 import {
-  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, onAuthStateChanged,
+  getAuth, signOut, onAuthStateChanged,
 } from "firebase/auth";
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc,
@@ -25,29 +24,8 @@ export const firestore = getFirestore(app);
 export const db        = firestore;
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-export const loginWithEmail = (email, password) => signInWithEmailAndPassword(auth, email, password);
-export const logout         = () => signOut(auth);
-export const onAuthChange   = (cb) => onAuthStateChanged(auth, cb);
-
-/**
- * Register flow that works even if the email already exists (e.g. customer account).
- * 1. Try sign-in first — if it works the account exists and credentials are correct.
- * 2. If user-not-found → create a new account.
- * 3. If wrong-password → account exists but password is wrong → re-throw so UI can show the error.
- */
-export const registerOrLogin = async (email, password) => {
-  try {
-    return await signInWithEmailAndPassword(auth, email, password);
-  } catch (signInErr) {
-    const code = signInErr.code;
-    if (code === "auth/user-not-found" || code === "auth/invalid-credential") {
-      // No account yet — create one
-      return await createUserWithEmailAndPassword(auth, email, password);
-    }
-    // Wrong password or other error — surface it to the caller
-    throw signInErr;
-  }
-};
+export const logout       = () => signOut(auth);
+export const onAuthChange = (cb) => onAuthStateChanged(auth, cb);
 
 // ── Staff → Salon linking ─────────────────────────────────────────────────────
 

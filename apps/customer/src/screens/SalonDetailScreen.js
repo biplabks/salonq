@@ -7,7 +7,8 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getSalon } from "../firebase";
+import { getSalon, db } from "../firebase";
+import { collection, getDocs } from "firebase/firestore";
 import { formatWait, isSalonOpen, formatPrice, DAYS, DAY_LABELS } from "../utils";
 import { useCurrentTime } from "../hooks/useCurrentTime";
 
@@ -34,13 +35,28 @@ function getSalonInitials(name = "") {
 export default function SalonDetailScreen({ route, navigation }) {
   const now      = useCurrentTime();
   const { salonId } = route.params;
-  const [salon,       setSalon]       = useState(null);
-  const [loading,     setLoading]     = useState(true);
-  const [tab,         setTab]         = useState("services");
-  const [hasActiveQ,  setHasActiveQ]  = useState(null); // null = checking
+  const [salon,        setSalon]        = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [tab,          setTab]          = useState("services");
+  const [hasActiveQ,   setHasActiveQ]   = useState(null); // null = checking
+  const [reviewCount,  setReviewCount]  = useState(null);
+  const [reviewAvg,    setReviewAvg]    = useState(null);
 
   useEffect(() => {
     getSalon(salonId).then((s) => { setSalon(s); setLoading(false); });
+  }, [salonId]);
+
+  // Fetch live review stats from subcollection — salon document value can be stale
+  useEffect(() => {
+    getDocs(collection(db, "salons", salonId, "reviews")).then((snap) => {
+      const reviews = snap.docs.map((d) => d.data());
+      const count   = reviews.length;
+      const avg     = count > 0
+        ? Math.round((reviews.reduce((s, r) => s + (r.salonRating || 0), 0) / count) * 10) / 10
+        : 0;
+      setReviewCount(count);
+      setReviewAvg(avg);
+    }).catch(() => {});
   }, [salonId]);
 
   useFocusEffect(useCallback(() => {
@@ -90,21 +106,21 @@ export default function SalonDetailScreen({ route, navigation }) {
           </View>
         </LinearGradient>
 
-        {/* Rating row */}
-        {salon.avgRating ? (
+        {/* Rating row — uses live counts fetched from reviews subcollection */}
+        {reviewCount > 0 ? (
           <TouchableOpacity
             style={s.ratingRow}
             onPress={() => navigation.navigate("Reviews", {
               salonId,
               salonName:    salon.name,
-              avgRating:    salon.avgRating,
-              totalRatings: salon.totalRatings,
+              avgRating:    reviewAvg,
+              totalRatings: reviewCount,
             })}
           >
             <View style={s.ratingLeft}>
               <Text style={s.ratingStar}>★</Text>
-              <Text style={s.ratingValue}>{salon.avgRating?.toFixed(1)}</Text>
-              <Text style={s.ratingCount}>({salon.totalRatings} reviews)</Text>
+              <Text style={s.ratingValue}>{reviewAvg?.toFixed(1)}</Text>
+              <Text style={s.ratingCount}>({reviewCount} reviews)</Text>
             </View>
             <Text style={s.ratingArrow}>See all →</Text>
           </TouchableOpacity>

@@ -3,8 +3,7 @@
 
 import { initializeApp, getApps } from "firebase/app";
 import {
-  getAuth, signInWithEmailAndPassword,
-  createUserWithEmailAndPassword, signOut, onAuthStateChanged,
+  getAuth, signOut, onAuthStateChanged,
 } from "firebase/auth";
 import {
   getFirestore, collection, collectionGroup, doc, getDoc, getDocs, setDoc,
@@ -27,9 +26,6 @@ export const auth = getAuth(app);
 export const db   = getFirestore(app);
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-export const loginWithEmail    = (email, password) => signInWithEmailAndPassword(auth, email, password);
-export const registerWithEmail = (email, password) => createUserWithEmailAndPassword(auth, email, password);
-
 // Fix 1: Clear AsyncStorage on logout so next user doesn't see previous queue
 export const logout = async () => {
   try {
