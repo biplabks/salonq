@@ -67,7 +67,7 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, "salons")), (snap) => {
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => !s.disabled);
       setSalons(data);
       setFiltered(data);
       setLoading(false);

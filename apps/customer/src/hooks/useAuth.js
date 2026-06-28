@@ -1,6 +1,6 @@
 // apps/customer/src/hooks/useAuth.js
 import { useState, useEffect } from "react";
-import { onAuthChange } from "../firebase";
+import { onAuthChange, saveCustomer } from "../firebase";
 
 export function useAuth() {
   const [user, setUser] = useState(null);
@@ -10,6 +10,13 @@ export function useAuth() {
     const unsub = onAuthChange((u) => {
       setUser(u);
       setLoading(false);
+      if (u) {
+        saveCustomer(u.uid, {
+          displayName: u.displayName,
+          email:       u.email,
+          photoURL:    u.photoURL,
+        }).catch(() => {});
+      }
     });
     return unsub;
   }, []);

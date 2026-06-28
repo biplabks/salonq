@@ -83,6 +83,12 @@ export const joinQueue = async ({
     .map((d) => d.data())
     .reduce((sum, e) => sum + (e.services || []).reduce((s, sv) => s + (sv.durationMin || 30), 0), 0);
 
+  // Ensure the customer document exists — recreates it after a DB clear
+  if (customerId) {
+    setDoc(doc(db, "customers", customerId), { updatedAt: serverTimestamp() }, { merge: true })
+      .catch(() => {});
+  }
+
   const newEntryRef = await addDoc(queueRef, {
     customerId,
     customerName,

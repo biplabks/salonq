@@ -16,6 +16,9 @@ import SalonRegisterScreen from "./src/screens/SalonRegisterScreen";
 import SalonSettingsScreen from "./src/screens/SalonSettingsScreen";
 import AnalyticsScreen     from "./src/screens/AnalyticsScreen";
 import ReviewsScreen       from "./src/screens/ReviewsScreen";
+import AdminScreen         from "./src/screens/AdminScreen";
+
+const ADMIN_UID = "nOEaVCR9gGf6uWJ2cwKGZe6gk8J2";
 
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -25,6 +28,7 @@ function AppInner() {
   const [salon,   setSalon]   = useState(null);
   const [salonId, setSalonId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const isAdmin = user?.uid === ADMIN_UID;
 
   useEffect(() => {
     if (Platform.OS === 'web' && 'serviceWorker' in navigator) {
@@ -83,44 +87,61 @@ function AppInner() {
     );
   }
 
-  if (!salonId) {
+  // Non-admin users with no linked salon must register one first
+  if (!salonId && !isAdmin) {
     return <SalonRegisterScreen onSalonCreated={handleSalonCreated} />;
   }
+
+  const tabIcon = (name) => (
+    <Text style={{ fontSize: 20 }}>
+      {name === "Queue"     ? "⏳"
+     : name === "Stylists"  ? "💇"
+     : name === "Analytics" ? "📊"
+     : name === "Reviews"   ? "⭐"
+     : name === "Admin"     ? "🛡️"
+     : "⚙️"}
+    </Text>
+  );
 
   return (
     <NavigationContainer>
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: false,
-          tabBarIcon: () => (
-            <Text style={{ fontSize: 20 }}>
-              {route.name === "Queue"     ? "⏳"
-             : route.name === "Stylists"  ? "💇"
-             : route.name === "Analytics" ? "📊"
-             : route.name === "Reviews"   ? "⭐"
-             : "⚙️"}
-            </Text>
-          ),
+          tabBarIcon: () => tabIcon(route.name),
           tabBarActiveTintColor:   "#1a1a2e",
           tabBarInactiveTintColor: "#9ca3af",
           tabBarStyle: { height: 60, paddingBottom: 8 },
         })}
       >
-        <Tab.Screen name="Queue">
-          {() => <QueueDashboard salonId={salonId} salon={salon} />}
-        </Tab.Screen>
-        <Tab.Screen name="Stylists">
-          {() => <StylistBoard salon={salon} salonId={salonId} />}
-        </Tab.Screen>
-        <Tab.Screen name="Analytics">
-          {() => <AnalyticsScreen salonId={salonId} salon={salon} />}
-        </Tab.Screen>
-        <Tab.Screen name="Reviews">
-          {() => <ReviewsScreen salonId={salonId} salon={salon} />}
-        </Tab.Screen>
-        <Tab.Screen name="Settings">
-          {() => <SalonSettingsScreen salon={salon} salonId={salonId} />}
-        </Tab.Screen>
+        {salonId && (
+          <Tab.Screen name="Queue">
+            {() => <QueueDashboard salonId={salonId} salon={salon} />}
+          </Tab.Screen>
+        )}
+        {salonId && (
+          <Tab.Screen name="Stylists">
+            {() => <StylistBoard salon={salon} salonId={salonId} />}
+          </Tab.Screen>
+        )}
+        {salonId && (
+          <Tab.Screen name="Analytics">
+            {() => <AnalyticsScreen salonId={salonId} salon={salon} />}
+          </Tab.Screen>
+        )}
+        {salonId && (
+          <Tab.Screen name="Reviews">
+            {() => <ReviewsScreen salonId={salonId} salon={salon} />}
+          </Tab.Screen>
+        )}
+        {salonId && (
+          <Tab.Screen name="Settings">
+            {() => <SalonSettingsScreen salon={salon} salonId={salonId} />}
+          </Tab.Screen>
+        )}
+        {isAdmin && (
+          <Tab.Screen name="Admin" component={AdminScreen} />
+        )}
       </Tab.Navigator>
     </NavigationContainer>
   );
