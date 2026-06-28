@@ -7,7 +7,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import SalonMap from "../components/SalonMap";
 import * as Location from "expo-location";
-import { collection, onSnapshot, query, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../firebase";
 import { formatWait, isSalonOpen, distanceKm } from "../utils";
 import { useCurrentTime } from "../hooks/useCurrentTime";
@@ -48,7 +48,6 @@ export default function HomeScreen({ navigation }) {
   const [viewMode,    setViewMode]    = useState("list");
   const [userLoc,     setUserLoc]     = useState(null);
   const [region,      setRegion]      = useState(DEFAULT_REGION);
-  const [reviewStats, setReviewStats] = useState({}); // { [salonId]: { count, avg } }
 
   useEffect(() => {
     (async () => {
@@ -75,24 +74,6 @@ export default function HomeScreen({ navigation }) {
     });
     return unsub;
   }, []);
-
-  // Batch-fetch live review stats once the salon list is known
-  useEffect(() => {
-    if (salons.length === 0) return;
-    Promise.all(
-      salons.map(async (salon) => {
-        const snap    = await getDocs(collection(db, "salons", salon.id, "reviews"));
-        const reviews = snap.docs.map((d) => d.data());
-        const count   = reviews.length;
-        const avg     = count > 0
-          ? Math.round((reviews.reduce((s, r) => s + (r.salonRating || 0), 0) / count) * 10) / 10
-          : 0;
-        return [salon.id, { count, avg }];
-      })
-    )
-      .then((entries) => setReviewStats(Object.fromEntries(entries)))
-      .catch(() => {});
-  }, [salons.length]);
 
   useEffect(() => {
     const q = search.toLowerCase();
@@ -121,11 +102,10 @@ export default function HomeScreen({ navigation }) {
   const renderSalon = ({ item }) => {
     const open      = isSalonOpen(item.hours, now);
     const distance  = getDistance(item);
-    const stats     = reviewStats[item.id];
-    const liveCount = stats?.count ?? item.totalRatings ?? 0;
-    const liveAvg   = stats?.avg   ?? item.avgRating   ?? 0;
-    const hasRating = liveCount > 0;
-    const fullStars = hasRating ? Math.round(liveAvg) : 0;
+    const count     = item.totalRatings ?? 0;
+    const avg       = item.avgRating    ?? 0;
+    const hasRating = count > 0;
+    const fullStars = hasRating ? Math.round(avg) : 0;
     const gradient  = getSalonGradient(item.id);
     const initials  = getSalonInitials(item.name);
 
@@ -147,9 +127,9 @@ export default function HomeScreen({ navigation }) {
               <Text style={s.stars}>
                 {[1, 2, 3, 4, 5].map((i) => (i <= fullStars ? "★" : "☆")).join("")}
               </Text>
-              <Text style={s.ratingNum}>{liveAvg.toFixed(1)}</Text>
+              <Text style={s.ratingNum}>{avg.toFixed(1)}</Text>
               <Text style={s.ratingCount}>
-                ({liveCount} {liveCount === 1 ? "review" : "reviews"})
+                ({count} {count === 1 ? "review" : "reviews"})
               </Text>
             </View>
           ) : (
